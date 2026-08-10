@@ -167,6 +167,12 @@ body.night #grade{opacity:1}
   max-height:190px;overflow:auto}
 .dy-foot{margin-top:10px;font-family:var(--font-mono);font-size:11px;color:var(--dim)}
 #shop-body{max-width:800px;max-height:60vh;overflow:auto;text-align:left}
+/* the shop you drove to (M10) — the range it stocks IS the mechanic, so it is stated */
+.sh-store{display:flex;flex-direction:column;gap:2px;padding:10px 14px;margin-bottom:10px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:11px}
+.sh-store b{font-family:var(--font-display);font-size:17px;color:var(--paper)}
+.sh-sub{font-size:12px;color:var(--dim)}
+.sh-range{font-family:var(--font-mono);font-size:11px;letter-spacing:.6px;color:var(--alien)}
 .sh-obj{margin-bottom:16px}
 .sh-h{font-size:14px;font-weight:700;margin-bottom:5px}
 .sh-row{display:flex;align-items:center;gap:10px;font-size:12px;padding:5px 8px;
@@ -257,7 +263,7 @@ body.night #grade{opacity:1}
 
 <!-- SHOP -->
 <div class="screen" id="s-shop">
-  <h1>BULWARK <span>MART</span></h1>
+  <h1 id="shop-name">BULWARK <span>MART</span></h1>
   <div id="shop-body"></div>
   <button class="ghost-btn" id="btn-shop-close">LEAVE</button>
 </div>
@@ -456,6 +462,12 @@ const CONST={
   WAGE        : 780,    // per week, paid Friday
   BILLS       : 445,    // per week, automatic
   IDENTICAL_MULT: 3.0,  // price multiplier for the 100%-similar special order
+  THRIFT_SUSP : 4,      // Wife Suspicion per visit to the second-hand place. Steve does
+                        // not shop there, so doing it repeatedly is a habit she notices.
+                        // This is the thrift store's REAL price; the money is nothing.
+  THRIFT_STOCK: 0.62,   // per-kind chance the thrift has your kind of thing this week.
+                        // Seeded per week, so it is a fact you can plan around, and it
+                        // stops "just go to the thrift" being the answer to everything.
   CASH_FEE    : 3,
   HK_MAX      : 100,
   // ── her (GDD 5.9) ─────────────────────────────────────
@@ -1129,7 +1141,15 @@ const RESIDENTS={
            seed:null,       sleepQuality:0.80,doubt:0,suspicion:0,stress:0,credibility:0.6},
   dev    :{name:'Dev Okonkwo', house:'okonkwo',noticeFloor:12,doubtBand:30,attention:1.2,
            seed:'tech',     sleepQuality:0.90,doubt:0,suspicion:0,stress:0,credibility:0.3},
-  grace  :{name:'Grace Okonkwo',house:'okonkwo',noticeFloor:30,doubtBand:25,attention:0.7,
+  /* Retuned 2026-08-10 (attention was 0.7). EXACTLY the Walt bug one row up, and it
+     went unfixed for eight milestones: a high floor AND low attention multiply, so on
+     a low-attachment object (her curtains, 0.7) she needed raw 0.61 before noticing
+     anything at all — past what the variant generator can even produce for some kinds.
+     Measured: 0 of her 4 objects had a single doubt rung in any shop.
+     Her identity is a HIGH FLOOR — she misses small things completely — not blindness.
+     At attention 1.0 the floor still makes her the hardest person on the street, and
+     the thrift store's range now reaches her. See GDD 15. */
+  grace  :{name:'Grace Okonkwo',house:'okonkwo',noticeFloor:30,doubtBand:25,attention:1.0,
            seed:null,       sleepQuality:0.30,doubt:0,suspicion:0,stress:0,credibility:0.7},
   /* Phase-2 resident, present in M2 only as a Doubt Curve stub: his 3-point band is
      the whole reason he is un-gaslightable, and his 0.1 credibility is the whole
@@ -3118,9 +3138,20 @@ const ACTIONS={
     run(){GAME.wagePenalty+=150;wifeAdd(6);
       return 'You told them you had a temperature. Dana heard you say it in a voice you have not used before.';}},
   /* ── MIDDAY / AFTERNOON ── */
+  /* Three destinations, one action each: WHICH SHOP is the decision, and the day
+     budget is what makes it cost something (GDD 5.7). */
   shop:{block:'midday afternoon',label:'Drive to Bulwark Mart',
     desc:'Buy things that are almost the same as other things.',
-    run(){openShop();return null;}},
+    run(){openShop('bulwark');return null;}},
+  thrift:{block:'midday afternoon',label:'Drive to Second Chances',
+    desc:'The second-hand place. Cheap, unreliable, and nothing in it matches.',
+    run(){wifeAdd(CONST.THRIFT_SUSP);openShop('thrift');
+      return 'You spent an hour in a second-hand shop two towns over. Dana asked what '+
+             'you were doing out there. You said "browsing", which is a word you have '+
+             'heard people use.';}},
+  antique:{block:'midday',label:'Call at Ardsley Antiques',
+    desc:'By appointment. They will find you something almost exactly right.',
+    run(){openShop('antique');return null;}},
   cash:{block:'midday',label:'Take cash out',
     desc:'A card statement is a list of everything you have done.',
     run(){const take=Math.min(GAME.bank,120);
@@ -3212,26 +3243,89 @@ function beginNight(){
    band maps in GDD 4/15), so a shelf that only spans 97-76% leaves half the cast
    unreachable and the other half with exactly one viable rung. */
 const SHOP_LADDER=[97,94,90,84,76,66];
-function shopStock(objId){
+
+/* ── THE STORES (M10) ────────────────────────────────────────────────────────
+   Three shops, and the ONLY real difference between them is the RANGE they stock.
+
+   One ladder cannot serve this cast. On the objects they own, Marisol's doubt window
+   is raw 0.027-0.097 and Grace's runs to 0.87 — a 15x spread — because `perceived`
+   multiplies raw delta by attention AND attachment. Bulwark's widest rung is 66%
+   similar, so for eight milestones EVERY rung read MISSED to Grace and she was
+   literally unplayable (GDD 15, open since M2). Measured, not guessed: 0 of her 4
+   objects had a doubt rung.
+
+   Nothing gates these stores except the maths. A 42%-similar curtain is CERTAINTY to
+   Marisol and invisible to Grace, so the shop you drive to IS the read you have taken
+   on the person — which is the observe-then-acquire loop, expressed as a destination.
+   The balance takes care of itself: buying "more different" cannot help you against
+   someone who already notices everything. */
+const STORES=[
+  {id:'bulwark',name:'Bulwark Mart',short:'BULWARK',
+   sub:'Groceries, home, hardware. Everything in here is fine.',
+   range:'the middle of the street',
+   ladder:SHOP_LADDER,priceMult:1.00,stockP:1.00,susp:0,special:true},
+  {id:'thrift',name:'Second Chances',short:'THRIFT',
+   sub:'Second-hand, two towns over. Nothing in here matches anything else.',
+   range:'people who barely look up',
+   ladder:[64,52,42,32,22],priceMult:0.35,stockP:CONST.THRIFT_STOCK,
+   susp:CONST.THRIFT_SUSP,special:false},
+  {id:'antique',name:'Ardsley Antiques',short:'ANTIQUE',
+   sub:'By appointment. Everything here is very nearly perfect.',
+   range:'people who notice everything',
+   /* bottom rung sits ABOVE Bulwark's top (97) on purpose: each shop owns a band of
+      the spectrum outright, so "which shop" is a clean read and not a coin toss
+      between two overlapping shelves */
+   ladder:[99.2,98.6,98.2,97.7,97.3],priceMult:3.60,stockP:1.00,susp:0,special:false},
+];
+function storeById(id){return STORES.filter(s=>s.id===id)[0]||STORES[0];}
+/* Deterministic per week, so "the thrift didn't have one" is a fact you can plan
+   around rather than a dice roll at the counter. */
+function storeHas(storeId,kindId){
+  const st=storeById(storeId);
+  if(st.stockP>=1)return true;
+  return mulberry32(hashStr(storeId+':'+kindId)+GAME.week*7919)()<st.stockP;
+}
+
+function shopStock(objId,storeId){
   const c=CATALOG[objId];
   if(!c)return [];
-  const rng=mulberry32(hashStr(objId)+GAME.week*7919);
+  const st=storeById(storeId||'bulwark');
+  if(!storeHas(st.id,c.kind))return [];
+  /* The seed carries the store, or every shop would stock the identical shelf and
+     "drive somewhere else" would be a no-op. */
+  const rng=mulberry32(hashStr(objId+'@'+st.id)+GAME.week*7919);
   const kind=PROP_KINDS[c.kind];
-  const out=SHOP_LADDER.map(target=>{
+  const out=st.ladder.map(target=>{
     const v=variantNear(c.kind,c.spec,rng,target);
     const d=specDelta(c.kind,c.spec,v);
     const span=kind.price[1]-kind.price[0];
     return {kind:c.kind,spec:v,forId:objId,label:c.label,sim:d.similarity,diffs:d.diffs,
-            price:Math.round(kind.price[0]+span*(0.35+rng()*0.65))};
+            store:st.id,
+            price:Math.max(1,Math.round((kind.price[0]+span*(0.35+rng()*0.65))*st.priceMult))};
   });
-  /* variantNear only APPROXIMATES its target, so two rungs can cross over and the
-     shelf stops reading as a ladder. Sort it — the whole point of the display is
-     that similarity descends as you go down. */
+  /* variantNear only APPROXIMATES its target, so two rungs can land on the SAME
+     similarity — the shelf then shows two identical-looking options at two different
+     prices, which is worse than a mis-ordered one. Re-draw a colliding rung against a
+     shifted target, which moves both the rng stream and the goal, so it converges
+     instead of re-rolling the same collision. (Sorting alone fixes order, not ties.) */
+  for(let i=1;i<out.length;i++){
+    const collides=()=>out.slice(0,i).some(p=>Math.abs(p.sim-out[i].sim)<0.4);
+    for(let t=0;t<5&&collides();t++){
+      const v=variantNear(c.kind,c.spec,rng,st.ladder[i]-(t+1)*1.5);
+      const d=specDelta(c.kind,c.spec,v);
+      out[i].spec=v;out[i].sim=d.similarity;out[i].diffs=d.diffs;
+    }
+  }
+  /* ...and THEN sort, so the display always reads as a descending ladder. */
   out.sort((a,b)=>b.sim-a.sim);
-  // the identical special order: useless for doubt, essential against a marked object
-  out.push({kind:c.kind,spec:JSON.parse(JSON.stringify(c.spec)),forId:objId,label:c.label,
-            sim:100,diffs:[],identical:true,
-            price:Math.round(kind.price[1]*CONST.IDENTICAL_MULT)});
+  /* The identical special order: useless for doubt, essential against a marked object
+     (GDD 5.3.5). Bulwark only — a second-hand shop cannot order you a perfect copy of
+     something, and putting it in every store would quietly halve the price of
+     defeating a mark, which M7 balances around. */
+  if(st.special)
+    out.push({kind:c.kind,spec:JSON.parse(JSON.stringify(c.spec)),forId:objId,label:c.label,
+              sim:100,diffs:[],identical:true,store:st.id,
+              price:Math.round(kind.price[1]*CONST.IDENTICAL_MULT)});
   return out;
 }
 /* What the scanner will tell you about a purchase, gated by Human Knowledge. */
@@ -3250,15 +3344,19 @@ function predict(objId,variant){
   return {text:r.band,cls:r.band==='DOUBT'?'sh-good':(r.band==='CERTAINTY'?'sh-bad':'sh-dim'),
           delta:r.delta,floor:r.floor,ceiling:r.ceiling};
 }
-function buyVariant(objId,idx){
-  const stock=shopStock(objId),it=stock[idx];
+function buyVariant(objId,idx,storeId){
+  const st=storeById(storeId||'bulwark');
+  const stock=shopStock(objId,st.id),it=stock[idx];
   if(!it)return null;
-  if(GAME.bought[objId+'#'+idx])return 'already';
+  // the key carries the store, or buying the 42% at the thrift would mark the 42%
+  // at Bulwark as already bought
+  const key=objId+'@'+st.id+'#'+idx;
+  if(GAME.bought[key])return 'already';
   if(money()<it.price)return 'poor';
   const how=spend(it.price);
   if(!how)return 'poor';
-  GAME.bought[objId+'#'+idx]=true;
-  INV.push({kind:it.kind,spec:it.spec,forId:objId,label:it.label,sim:it.sim});
+  GAME.bought[key]=true;
+  INV.push({kind:it.kind,spec:it.spec,forId:objId,label:it.label,sim:it.sim,store:st.id});
   SFX.cue('buy');
   return how;
 }
@@ -3857,17 +3955,33 @@ function showDay(){
     btn.addEventListener('click',function(){doAction(btn.getAttribute('data-a'));});
   });
 }
-function openShop(){
+function openShop(storeId){
+  const st=storeById(storeId||'bulwark');
   const ids=Object.keys(CATALOG);
   const cal=['scanner uncalibrated','partial read','calibrated','predictive'][hkTier()];
-  let h='<div class="dy-meta">$'+money().toFixed(0)+' &middot; '+cal+'</div>';
+  /* The screen title names where you drove to. It used to be the hard-coded string
+     "BULWARK MART", which was silently wrong at the other two shops. */
+  const words=st.name.toUpperCase().split(' ');
+  $('shop-name').innerHTML=words.length>1
+    ? words.slice(0,-1).join(' ')+' <span>'+words[words.length-1]+'</span>'
+    : words[0];
+  let h='<div class="sh-store">'+
+        '<span class="sh-sub">'+st.sub+'</span>'+
+        '<span class="sh-range">stocks '+st.ladder[st.ladder.length-1]+'&ndash;'+
+        st.ladder[0]+'% &middot; for '+st.range+'</span></div>';
+  h+='<div class="dy-meta">$'+money().toFixed(0)+' &middot; '+cal+'</div>';
   if(!ids.length)h+='<div class="ds-dim">You have recorded nothing. There is nothing here to match.</div>';
   ids.forEach(id=>{
     const c=CATALOG[id];
+    const stock=shopStock(id,st.id);
     h+='<div class="sh-obj"><div class="sh-h">'+c.label+
        ' <span class="ds-dim">'+PROP_KINDS[c.kind].alienName+'</span></div>';
-    shopStock(id).forEach((it,i)=>{
-      const p=predict(id,it),owned=GAME.bought[id+'#'+i],broke=money()<it.price;
+    if(!stock.length){
+      h+='<div class="sh-row ds-dim">nothing like it in this week&rsquo;s stock</div></div>';
+      return;
+    }
+    stock.forEach((it,i)=>{
+      const p=predict(id,it),owned=GAME.bought[id+'@'+st.id+'#'+i],broke=money()<it.price;
       h+='<div class="sh-row"><b>'+it.sim.toFixed(1)+'%</b>'+
          '<span class="sh-diff">'+(it.identical?'identical &mdash; special order':
            describeDiffs(it.kind,it.diffs,2))+'</span>'+
@@ -3882,10 +3996,10 @@ function openShop(){
   go('s-shop');S.menuOpen=true;
   $('shop-body').querySelectorAll('.sh-buy').forEach(function(b){
     b.addEventListener('click',function(){
-      const r=buyVariant(b.getAttribute('data-o'),+b.getAttribute('data-i'));
+      const r=buyVariant(b.getAttribute('data-o'),+b.getAttribute('data-i'),st.id);
       if(r==='poor')hint('Not enough for that.');
       else if(r==='card')hint('On the card. She sees the card.');
-      openShop();
+      openShop(st.id);
     });
   });
 }
@@ -4199,6 +4313,8 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
   wifeTier,wifeAdd,hkGain,hkTier,money,spend,reactionBeat,
   startDay,doAction,nextBlock,beginNight,blockActions,
   shopStock,predict,buyVariant,pickScene,showDay,openShop,openTalk,
+  // ── M10: the stores ──
+  STORES,storeById,storeHas,
   // ── M7: her ladder acting, fractures, marking ──
   FRACTURES,fireFractures,markOwned,relocate,
   wifeTierIndex,planWifeNight,wifeNightTick,isHome,

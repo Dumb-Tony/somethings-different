@@ -43,6 +43,12 @@ something *almost* the same. Every morning they wake up and look at it.
 - Sneak. Sound carries through doorways but not through walls, and June Hoyt is a
   light sleeper.
 - Every house's fridge hums at a slightly different pitch. That is on purpose.
+- **There are three shops, and they stock different things.** Bulwark Mart sells you
+  roughly-similar; the second-hand place sells you *nothing like it*; the antique shop
+  sells you *almost exactly it*. Which one you drive to should follow from who you're
+  targeting — a heavy sleeper won't register anything subtle, and someone who measures
+  their shelves will spot anything that isn't near-perfect. The scanner forecasts the
+  outcome before you buy, and it doesn't lie.
 - Things you should tell us about: does the *doubt* band feel findable, or does it
   feel like a coin flip? Is a night long enough? Can you hear a sleeper getting close
   to waking in time to stop? Does anything read as a bug?
