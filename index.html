@@ -44,6 +44,32 @@ h1 span{color:var(--alien)}
   background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 20px;color:var(--dim)}
 .keys b{color:var(--text);font-family:var(--font-mono);font-size:12px;text-align:right}
 
+/* ── the mixer (M9). The only <input> UI in the game, so it carries its own
+      styling rather than a general form system that nothing else would use. ──── */
+.mix{display:grid;grid-template-columns:auto 190px 42px;gap:13px 14px;align-items:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px}
+.mix label{font-size:12px;font-weight:800;color:var(--dim);text-align:right;letter-spacing:.6px}
+.mix output{font-family:var(--font-mono);font-size:12px;color:var(--alien);text-align:right}
+.mix input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:3px;
+  background:var(--panel2);border:1px solid var(--line);outline:none;cursor:pointer}
+.mix input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:15px;height:15px;
+  border-radius:50%;background:var(--alien);border:none;cursor:pointer}
+.mix input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;
+  background:var(--alien);border:none;cursor:pointer}
+.mix input[type=range]:focus-visible{box-shadow:0 0 0 2px var(--alien-dim)}
+/* hand-drawn rather than accent-color: a native unchecked box renders as a stark
+   white square, which is the brightest thing on a dark panel and reads as an error */
+.mix input[type=checkbox]{-webkit-appearance:none;appearance:none;width:17px;height:17px;
+  justify-self:start;border:1px solid var(--line);border-radius:5px;background:var(--panel2);
+  cursor:pointer;position:relative}
+.mix input[type=checkbox]:hover{border-color:var(--alien-dim)}
+.mix input[type=checkbox]:checked{background:var(--coral);border-color:var(--coral)}
+.mix input[type=checkbox]:checked::after{content:'';position:absolute;left:5px;top:1px;
+  width:4px;height:9px;border:solid #2b0b0b;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.mix input[type=checkbox]:focus-visible{box-shadow:0 0 0 2px var(--alien-dim)}
+/* muted: the sliders stay live (you can still set a level while silent) but read as inert */
+.mix.muted input[type=range],.mix.muted output{opacity:.32}
+
 /* ── HUD layer (z 20-30) — deliberately NOT .screen so it survives go() ───────── */
 #hud{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:20;display:none;gap:8px}
 #hud.on{display:flex}
@@ -193,7 +219,10 @@ body.night #grade{opacity:1}
     Find the spare key. Get inside. Scan what they own, requisition a near-match,
     swap it &mdash; then see what they make of it in the morning.</div>
   <button class="big-btn" id="btn-house">12 ARDSLEY CT</button>
-  <button class="ghost-btn" id="btn-start">engine greybox</button>
+  <div style="display:flex;gap:10px">
+    <button class="ghost-btn" id="btn-start">engine greybox</button>
+    <button class="ghost-btn" id="btn-sound-title">sound</button>
+  </div>
   <div class="keys">
     <b>W A S D</b><span>move (camera-relative)</span>
     <b>Shift</b><span>run</span>
@@ -261,7 +290,27 @@ body.night #grade{opacity:1}
     <button class="ghost-btn" id="btn-save">SAVE</button>
     <button class="ghost-btn" id="btn-load">LOAD</button>
   </div>
+  <button class="ghost-btn" id="btn-sound">SOUND</button>
   <button class="ghost-btn" id="btn-title">BACK TO TITLE</button>
+</div>
+
+<!-- SOUND (M9). A .screen, so go() gives it exclusivity for free; BACK returns to
+     whichever screen opened it (title or pause) via S.soundBack. -->
+<div class="screen" id="s-sound">
+  <h1>SOUND</h1>
+  <div class="sub">The night is quiet on purpose. That low tone you can hear rising is not
+    music &mdash; it is how close the nearest sleeper is to opening their eyes.</div>
+  <div class="mix" id="mix">
+    <label for="mx-mute">MUTE</label>
+    <input type="checkbox" id="mx-mute"><span></span>
+    <label for="mx-music">TONE</label>
+    <input type="range" id="mx-music" min="0" max="100" step="1"><output id="mx-music-v">70%</output>
+    <label for="mx-world">WORLD</label>
+    <input type="range" id="mx-world" min="0" max="100" step="1"><output id="mx-world-v">85%</output>
+    <label for="mx-foley">FOLEY</label>
+    <input type="range" id="mx-foley" min="0" max="100" step="1"><output id="mx-foley-v">90%</output>
+  </div>
+  <button class="ghost-btn" id="btn-sound-back">BACK</button>
 </div>
 
 <script>
@@ -377,6 +426,26 @@ const CONST={
   AWAKE_TIME  : 22.0,
   N_STEP_SNEAK: 0.35, N_STEP_WALK: 1.30, N_STEP_RUN: 3.60,
   N_DOOR      : 6.0, N_HANDLE: 3.5, N_SEARCH: 2.0, N_SCAN: 0.6,
+  // ── audio (GDD 8, M9) ─────────────────────────────────
+  // Deliberately its own block: audio must never be able to change a number the
+  // simulation reads, so nothing below this line is used outside SFX.
+  AUD_RANGE   : 20.0,   // metres to silence for a one-shot. WIDER than NOISE_RANGE
+                        // (11) on purpose — you can hear yourself from further away
+                        // than a sleeper can, so the sound is a warning, not a tell.
+  AUD_PAN     : 0.85,   // max stereo displacement; 1.0 is a hard-panned headphone gimmick
+  AUD_WALL_HZ : 5200,   // lowpass corner with ONE wall between; halves per extra wall
+  AUD_FOLEY_REF:0.55,   // reference peak for a one-shot at zero distance
+  AUD_DRONE_HZ: 48,     // the tension tone's fundamental
+  AUD_DRONE_MAX:0.30,   // its gain at heat 1.0 (a sleeper exactly at their threshold)
+  AUD_AMB_GAIN: 0.34,   // the outdoor bed (crickets, dog) at full
+  AUD_HUM_GAIN: 0.11,   // per-house fridge hum, heard from inside the kitchen
+  AUD_HUM_HZ  : 108,    // ...and its base pitch. Each house detunes off this.
+  AUD_HUM_SPREAD:0.018, // +/- this fraction per house. THE JOKE: every fridge hums at
+                        // ALMOST the same pitch, which is the whole game in one sound.
+                        // Was 0.055 — but that put the end houses 11% apart, nearly two
+                        // semitones, which reads as "different fridge" rather than as
+                        // "wait, was it always like that?". The whole street now fits
+                        // inside a semitone. See GDD 15.
   // being seen
   VISION_RANGE: 9.0,
   VISION_COS  : 0.64,   // cos(50 degrees) half-angle
@@ -494,76 +563,76 @@ function describeDiffs(kindId,diffs,max){
    a wedding ring 0.10 ("nobody swaps a ring"). This is the main safety rail against
    "just change everything" (GDD 4.3). */
 const PROP_KINDS={
-  cerealBox:{alienName:'GRAIN NUTRITION UNIT',cat:'kitchen',plaus:0.90,price:[4,9],
+  cerealBox:{alienName:'GRAIN NUTRITION UNIT',cat:'kitchen',mtl:'card',plaus:0.90,price:[4,9],
     seeds:['provision'],
     axes:{hue:{t:'hue',sal:0.90},
           brand:{t:'enum',v:['CRUNCH-O','FLAKEE','SUGRZ','BRAN!'],sal:0.85},
           mascot:{t:'enum',v:['bird','tiger','clown','none'],sal:1.00},
           pattern:{t:'enum',v:['solid','stripe','dots'],sal:0.40},
           h:{t:'num',min:0.24,max:0.34,sal:0.50}}},
-  coffeeMug:{alienName:'HOT BROWN LIQUID VESSEL',cat:'kitchen',plaus:0.70,price:[6,18],
+  coffeeMug:{alienName:'HOT BROWN LIQUID VESSEL',cat:'kitchen',mtl:'ceramic',plaus:0.70,price:[6,18],
     seeds:['provision','identity'],
     axes:{hue:{t:'hue',sal:0.95},
           glaze:{t:'enum',v:['matte','gloss','speckle'],sal:0.55},
           slogan:{t:'enum',v:['none','WORLD’S BEST DAD','I<3 GOLF','stripes'],sal:0.90},
           handle:{t:'enum',v:['round','angular','none'],sal:0.65},
           h:{t:'num',min:0.08,max:0.13,sal:0.45}}},
-  pictureFrame:{alienName:'FLAT MEMORY ARTEFACT',cat:'living',plaus:0.60,price:[12,40],
+  pictureFrame:{alienName:'FLAT MEMORY ARTEFACT',cat:'living',mtl:'glass',plaus:0.60,price:[12,40],
     seeds:['memory','order'],
     axes:{frameHue:{t:'hue',sal:0.60},
           frameStyle:{t:'enum',v:['thin','ornate','box'],sal:0.70},
           photo:{t:'enum',v:['beach','wedding','school','garden'],sal:1.00},
           smiling:{t:'bool',sal:0.85},
           w:{t:'num',min:0.14,max:0.30,sal:0.50}}},
-  wallClock:{alienName:'TIME ANXIETY DISC',cat:'living',plaus:0.45,price:[15,55],
+  wallClock:{alienName:'TIME ANXIETY DISC',cat:'living',mtl:'plastic',plaus:0.45,price:[15,55],
     seeds:['precision','order'],
     axes:{hue:{t:'hue',sal:0.70},
           face:{t:'enum',v:['roman','arabic','plain','dots'],sal:0.90},
           hands:{t:'enum',v:['black','gold','red'],sal:0.60},
           r:{t:'num',min:0.10,max:0.22,sal:0.65}}},
-  keyring:{alienName:'ACCESS TOKEN CLUSTER',cat:'hall',plaus:0.80,price:[3,14],
+  keyring:{alienName:'ACCESS TOKEN CLUSTER',cat:'hall',mtl:'metal',plaus:0.80,price:[3,14],
     seeds:['precision','order'],
     axes:{fobHue:{t:'hue',sal:0.85},
           count:{t:'num',min:2,max:7,sal:0.75},
           fob:{t:'enum',v:['leather','plastic','none','photo'],sal:0.80},
           bright:{t:'bool',sal:0.35}}},
-  curtains:{alienName:'LIGHT DENIAL SHEET',cat:'living',plaus:0.50,price:[40,110],
+  curtains:{alienName:'LIGHT DENIAL SHEET',cat:'living',mtl:'cloth',plaus:0.50,price:[40,110],
     seeds:['order'],
     axes:{hue:{t:'hue',sal:0.90},
           pattern:{t:'enum',v:['plain','vstripe','hstripe','floral'],sal:0.95},
           length:{t:'num',min:1.2,max:2.4,sal:0.80},
           weave:{t:'enum',v:['light','heavy'],sal:0.40}}},
-  gardenGnome:{alienName:'SMALL CERAMIC SENTINEL',cat:'garden',plaus:0.65,price:[9,32],
+  gardenGnome:{alienName:'SMALL CERAMIC SENTINEL',cat:'garden',mtl:'ceramic',plaus:0.65,price:[9,32],
     seeds:['nature','order'],
     axes:{hatHue:{t:'hue',sal:0.85},
           pose:{t:'enum',v:['fishing','waving','sleeping','reading'],sal:1.00},
           beard:{t:'enum',v:['long','short','none'],sal:0.55},
           h:{t:'num',min:0.22,max:0.46,sal:0.60}}},
-  potPlant:{alienName:'CAPTIVE PHOTOSYNTHESISER',cat:'living',plaus:0.55,price:[11,38],
+  potPlant:{alienName:'CAPTIVE PHOTOSYNTHESISER',cat:'living',mtl:'soil',plaus:0.55,price:[11,38],
     seeds:['nature','order'],
     axes:{potHue:{t:'hue',sal:0.70},
           pot:{t:'enum',v:['terracotta','glazed','plastic'],sal:0.55},
           leaf:{t:'enum',v:['broad','spiky','trailing'],sal:1.00},
           h:{t:'num',min:0.26,max:0.62,sal:0.70}}},
-  alarmClock:{alienName:'MANDATORY WAKING DEVICE',cat:'bedroom',plaus:0.50,price:[9,34],
+  alarmClock:{alienName:'MANDATORY WAKING DEVICE',cat:'bedroom',mtl:'plastic',plaus:0.50,price:[9,34],
     seeds:['precision','tech'],
     axes:{caseHue:{t:'hue',sal:0.60},
           face:{t:'enum',v:['digital','analogue'],sal:1.00},
           glow:{t:'enum',v:['green','red','blue'],sal:0.80},
           w:{t:'num',min:0.10,max:0.19,sal:0.50}}},
-  bookRow:{alienName:'STACKED PAPER MEMORY',cat:'living',plaus:0.65,price:[7,26],
+  bookRow:{alienName:'STACKED PAPER MEMORY',cat:'living',mtl:'paper',plaus:0.65,price:[7,26],
     seeds:['memory','order'],
     axes:{hue:{t:'hue',sal:0.75},
           count:{t:'num',min:4,max:11,sal:0.85},
           lean:{t:'bool',sal:0.60},
           tall:{t:'num',min:0.17,max:0.27,sal:0.55}}},
-  tableLamp:{alienName:'CONTROLLED SMALL SUN',cat:'living',plaus:0.60,price:[14,52],
+  tableLamp:{alienName:'CONTROLLED SMALL SUN',cat:'living',mtl:'ceramic',plaus:0.60,price:[14,52],
     seeds:['order'],
     axes:{shadeHue:{t:'hue',sal:0.85},
           shade:{t:'enum',v:['drum','cone','globe'],sal:0.90},
           base:{t:'enum',v:['brass','ceramic','black'],sal:0.60},
           h:{t:'num',min:0.28,max:0.46,sal:0.60}}},
-  keyboard:{alienName:'SYMBOL INPUT SLAB',cat:'bedroom',plaus:0.75,price:[18,70],
+  keyboard:{alienName:'SYMBOL INPUT SLAB',cat:'bedroom',mtl:'plastic',plaus:0.75,price:[18,70],
     seeds:['tech','precision'],
     axes:{caseHue:{t:'hue',sal:0.55},
           keycaps:{t:'enum',v:['black','white','grey','rgb'],sal:0.90},
@@ -2180,13 +2249,13 @@ function movePlayer(dt){
   // normalized against WALK so walk reads 1.0 — this is the signal that drives
   // footstep cadence AND the night-time noise model (GDD 5.5).
   S.speedNorm=Math.hypot(S.mvx,S.mvz)/CONST.WALK_SPEED;
-  if(S.grounded&&S.speedNorm>0.06&&S.phase==='house'){
+  if(S.grounded&&S.speedNorm>0.06){
     S.stepT=(S.stepT||0)-dt;
     if(S.stepT<=0){
       S.stepT=0.44/Math.max(0.4,S.speedNorm);
       emitNoise(player.position.x,player.position.z,
         S.moveMode==='sneak'?CONST.N_STEP_SNEAK
-        :(S.moveMode==='run'?CONST.N_STEP_RUN:CONST.N_STEP_WALK));
+        :(S.moveMode==='run'?CONST.N_STEP_RUN:CONST.N_STEP_WALK),'step');
     }
   }else S.stepT=0;
 
@@ -2320,6 +2389,424 @@ function updateHUD(dt){
     'fps    <i>'+S.fps.toFixed(0)+'</i>';
 }
 
+/* ═════════════════════════ AUDIO ═════════════════════════
+   WebAudio, synthesised from nothing — no files, no fetches. The page has to stay a
+   single self-contained document (GDD 9), so every sound in this game is oscillators,
+   filters and one shared noise buffer.
+
+   THE RULE THAT MAKES THIS A GAMEPLAY SYSTEM AND NOT DECORATION:
+   what the PLAYER hears is emitted by the same call that tells the SLEEPERS what they
+   heard. emitNoise(x,z,mag,snd) plays `snd` at (x,z) scaled by the same `mag` it adds
+   to their meters. There is no second list of "also play a sound here" to forget to
+   update, so a sound and its consequence cannot drift apart.
+
+   The low tone is not music either. It is loudestHeat() made audible — the one thing
+   the HUD percentage could never tell you in peripheral vision, which is exactly when
+   you need it, because you are looking at a sleeping man and not at the HUD.
+
+   An AudioContext may not be constructed before a user gesture, so ctx stays null
+   until arm(). EVERY public method here must be a safe no-op in that state: the game
+   is required to behave identically with the whole audio layer dead. */
+const AUDIO_KEY='sd_audio_v1';
+const SFX=(function(){
+  const set={mute:false,music:0.70,world:0.85,foley:0.90};
+  let ctx=null,master=null,noiseBuf=null,drone=null,amb=null,dead=false;
+  const bus={};
+  const hums=[];
+  const clock={dog:6,creak:9};
+
+  const cl01=v=>v<0?0:(v>1?1:v);
+
+  /* Mix settings live in their OWN localStorage key, not the save file. Starting a
+     new game must not reset someone's volume, and a corrupt save must not silence
+     the game. */
+  (function loadMix(){
+    try{
+      const d=JSON.parse(localStorage.getItem(AUDIO_KEY)||'null');
+      if(d&&typeof d==='object'){
+        if(typeof d.mute==='boolean')set.mute=d.mute;
+        ['music','world','foley'].forEach(k=>{
+          if(typeof d[k]==='number'&&isFinite(d[k]))set[k]=cl01(d[k]);});
+      }
+    }catch(e){}
+  })();
+  function persist(){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(set));}catch(e){}}
+
+  /* A linear slider sounds like it does nothing until the last fifth of its travel;
+     squaring is the cheap standard correction. */
+  function busGain(k){return set.mute?0:set[k]*set[k];}
+  function applyMix(){
+    if(!ctx)return;
+    const t=ctx.currentTime;
+    ['music','world','foley'].forEach(k=>{
+      if(bus[k])bus[k].gain.setTargetAtTime(busGain(k),t,0.02);});
+  }
+
+  function makeNoise(){
+    const n=Math.floor(ctx.sampleRate*2);
+    const b=ctx.createBuffer(1,n,ctx.sampleRate),d=b.getChannelData(0);
+    let brown=0;
+    for(let i=0;i<n;i++){
+      const w=Math.random()*2-1;
+      brown=(brown+0.02*w)/1.02;          // pure white is hissy; a little brown sits better
+      d[i]=w*0.65+brown*3.2;
+    }
+    return b;
+  }
+
+  /* Build the graph. Called from the first real user gesture. Never throws outward —
+     a browser that refuses us audio must still hand back a working game. */
+  function arm(){
+    if(ctx||dead)return ctx;
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC){dead=true;return null;}
+    try{
+      ctx=new AC();
+      master=ctx.createGain();master.gain.value=1;
+      /* One compressor across the whole mix. The drone plus a door plus two footsteps
+         can sum past full scale, and digital clipping reads as a bug, not as loudness. */
+      const comp=ctx.createDynamicsCompressor();
+      comp.threshold.value=-12;comp.ratio.value=6;
+      comp.attack.value=0.004;comp.release.value=0.18;
+      master.connect(comp);comp.connect(ctx.destination);
+      ['music','world','foley'].forEach(k=>{
+        const g=ctx.createGain();g.gain.value=busGain(k);g.connect(master);bus[k]=g;});
+      noiseBuf=makeNoise();
+    }catch(e){ctx=null;dead=true;return null;}
+    resume();
+    return ctx;
+  }
+  function resume(){
+    if(ctx&&ctx.state==='suspended'&&ctx.resume){try{ctx.resume();}catch(e){}}
+  }
+
+  /* ── the positional model ───────────────────────────────────────────────────
+     Loudness is measured from the PLAYER — you hear what your body is beside, not
+     what the camera is beside. The stereo image is measured from the CAMERA yaw, so
+     it agrees with what is on screen. Walls both attenuate and dull, using the SAME
+     wall count the sleepers' noise model uses (wallsBetween), so a door heard through
+     two walls sounds like it counted for less, because it did. */
+  function place(x,z){
+    if(!player)return {g:1,pan:0,walls:0,d:0};
+    const dx=x-player.position.x,dz=z-player.position.z,d=Math.hypot(dx,dz);
+    let g=1-d/CONST.AUD_RANGE; g=g<=0?0:g*g;
+    let pan=0;
+    if(d>0.06){
+      // screen-right is (cos yaw, 0, -sin yaw) — see _right in movePlayer
+      pan=(dx*Math.cos(S.yaw)-dz*Math.sin(S.yaw))/d;
+      pan=pan<-1?-1:(pan>1?1:pan);
+    }
+    let walls=0;
+    try{walls=wallsBetween(player.position.x,player.position.z,x,z);}catch(e){walls=0;}
+    if(walls>0)g*=Math.pow(0.55,walls);
+    return {g:g,pan:pan,walls:walls,d:d};
+  }
+  function chain(busName,p){
+    const head=ctx.createGain();head.gain.value=1;
+    let tail=head;
+    if(p&&p.walls>0){
+      const lp=ctx.createBiquadFilter();lp.type='lowpass';
+      lp.frequency.value=Math.max(190,CONST.AUD_WALL_HZ/Math.pow(2,p.walls));
+      tail.connect(lp);tail=lp;
+    }
+    if(ctx.createStereoPanner){
+      const pn=ctx.createStereoPanner();
+      pn.pan.value=(p?p.pan:0)*CONST.AUD_PAN;
+      tail.connect(pn);tail=pn;
+    }
+    tail.connect(bus[busName]||bus.foley);
+    return head;
+  }
+  /* one-shot filtered noise — footsteps, cloth, soil, the sweep of a door leaf */
+  function burst(p,vol,hz,q,dur,busName,type){
+    if(!ctx||!(vol>0.0004))return;
+    const t=ctx.currentTime;
+    const src=ctx.createBufferSource();
+    src.buffer=noiseBuf;src.loop=true;
+    src.playbackRate.value=0.7+Math.random()*0.6;
+    const f=ctx.createBiquadFilter();
+    f.type=type||'bandpass';f.frequency.value=hz;f.Q.value=q;
+    const e=ctx.createGain();
+    e.gain.setValueAtTime(0.0001,t);
+    e.gain.exponentialRampToValueAtTime(vol,t+0.006);
+    e.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.connect(f);f.connect(e);e.connect(chain(busName,p));
+    src.start(t);src.stop(t+dur+0.05);
+  }
+  /* one-shot pitched body — the ceramic clink, the alien scanner, the day cue */
+  function tone(p,vol,f0,f1,dur,busName,type,delay){
+    if(!ctx||!(vol>0.0004))return;
+    const t=ctx.currentTime+(delay||0);
+    const o=ctx.createOscillator();
+    o.type=type||'sine';
+    o.frequency.setValueAtTime(f0,t);
+    if(f1&&f1!==f0)o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
+    const e=ctx.createGain();
+    e.gain.setValueAtTime(0.0001,t);
+    e.gain.exponentialRampToValueAtTime(vol,t+0.004);
+    e.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(e);e.connect(chain(busName,p));
+    o.start(t);o.stop(t+dur+0.05);
+  }
+
+  /* ── the named vocabulary ───────────────────────────────────────────────────
+     Every voice takes the emitNoise magnitude, so LOUDER IN THE SIMULATION IS LOUDER
+     IN YOUR EARS by construction, rather than by my remembering to keep them in step. */
+  function handleMtl(p,v,mtl){
+    switch(mtl){
+      case 'ceramic':                       // the one horrible clink (GDD 8)
+        tone(p,v*0.85,1850,1770,0.30,'foley','sine');
+        tone(p,v*0.30,2830,2710,0.22,'foley','sine');
+        burst(p,v*0.22,3400,2.0,0.05,'foley');break;
+      case 'glass':
+        tone(p,v*0.70,2600,2520,0.34,'foley','sine');
+        tone(p,v*0.24,3900,3810,0.20,'foley','sine');break;
+      case 'metal':                         // a keyring is many small collisions
+        for(let i=0;i<3;i++)
+          tone(p,v*0.34,1400+i*730,1310+i*700,0.18+i*0.05,'foley','triangle',i*0.018);
+        break;
+      case 'cloth': burst(p,v*0.50, 900,0.4,0.30,'foley','highpass');break;
+      case 'paper': burst(p,v*0.45,2600,0.5,0.22,'foley','highpass');break;
+      case 'soil':  burst(p,v*0.50, 420,0.6,0.28,'foley');break;
+      case 'card':  burst(p,v*0.45,1200,0.6,0.16,'foley','highpass');break;
+      default:                              // plastic, wood, anything untagged
+        tone(p,v*0.45,420,300,0.13,'foley','triangle');
+        burst(p,v*0.28,900,1.0,0.09,'foley');
+    }
+  }
+  const VOICES={
+    step:function(p,mag){
+      const v=CONST.AUD_FOLEY_REF*p.g*Math.min(1,mag/CONST.N_STEP_RUN);
+      burst(p,v*0.95,240+Math.random()*90,1.1,0.085,'foley');
+      // a floorboard only complains under real weight — sneaking never creaks
+      if(mag>=CONST.N_STEP_WALK)
+        tone(p,v*0.34,88+Math.random()*40,68,0.10,'foley','triangle');
+    },
+    door:function(p,mag){
+      const v=CONST.AUD_FOLEY_REF*p.g;
+      burst(p,v*0.50,520,0.7,0.42,'foley');           // the leaf sweeping the carpet
+      tone(p,v*0.42,150,96,0.50,'foley','sawtooth');  // the hinge
+    },
+    search:function(p,mag){                            // soil, leaves, woodlice
+      burst(p,CONST.AUD_FOLEY_REF*p.g*0.62,1700,0.5,0.34,'foley','highpass');
+    },
+    scan:function(p,mag){                              // the alien's own instrument
+      const v=CONST.AUD_FOLEY_REF*p.g*0.42;
+      tone(p,v,1180,2100,0.16,'foley','sine');
+      tone(p,v*0.5,2360,3050,0.12,'foley','sine',0.03);
+    },
+    handle:function(p,mag,mtl){handleMtl(p,CONST.AUD_FOLEY_REF*p.g,mtl);}
+  };
+
+  /* The public emitter. Returns whether anything was actually scheduled — that is
+     what the tests assert on: audibility, not "did a function get called". */
+  function world(name,x,z,mag,mtl){
+    if(!ctx)return false;
+    const fn=VOICES[name];
+    if(!fn)return false;
+    const p=place(x,z);
+    if(p.g<=0.002)return false;           // out of earshot; don't build a graph for nothing
+    try{fn(p,mag===undefined?1:mag,mtl);}catch(e){return false;}
+    return true;
+  }
+
+  /* ── THE TENSION TONE ───────────────────────────────────────────────────────
+     GDD 8 asked for "a single sustained low tone that rises with room noise". It is
+     driven by loudestHeat(): 0 = everyone deeply asleep, 1.0 = someone is exactly at
+     their wake threshold. Past 1.0 a tremolo opens up, which is the audible form of
+     the stir grace period — you can hear yourself getting away with it. */
+  function ensureDrone(){
+    if(!ctx||drone)return drone;
+    const o1=ctx.createOscillator(),o2=ctx.createOscillator();
+    o1.type='sawtooth';o2.type='sawtooth';
+    o1.frequency.value=CONST.AUD_DRONE_HZ;
+    o2.frequency.value=CONST.AUD_DRONE_HZ*1.0058;    // ~0.6Hz beating; unsettles slowly
+    const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=95;lp.Q.value=5;
+    const trem=ctx.createGain();trem.gain.value=1;
+    const lfo=ctx.createOscillator();lfo.frequency.value=5.2;
+    const lfoG=ctx.createGain();lfoG.gain.value=0;
+    lfo.connect(lfoG);lfoG.connect(trem.gain);
+    const g=ctx.createGain();g.gain.value=0;
+    o1.connect(lp);o2.connect(lp);lp.connect(trem);trem.connect(g);g.connect(bus.music);
+    o1.start();o2.start();lfo.start();
+    drone={g:g,lp:lp,lfoG:lfoG,heat:0,level:0};
+    return drone;
+  }
+  function setHeat(h){
+    if(!ctx)return 0;
+    const d=ensureDrone();if(!d)return 0;
+    h=isFinite(h)?Math.max(0,Math.min(1.5,h)):0;
+    d.heat=h;
+    const t=ctx.currentTime;
+    const v=Math.pow(h,1.6)*CONST.AUD_DRONE_MAX;
+    d.level=v;
+    d.g.gain.setTargetAtTime(v,t,0.12);
+    d.lp.frequency.setTargetAtTime(92+h*520,t,0.15);
+    d.lfoG.gain.setTargetAtTime(h>1?Math.min(0.6,(h-1)*1.6):0,t,0.10);
+    return v;
+  }
+
+  /* ── the bed ────────────────────────────────────────────────────────────────
+     Crickets and an air-conditioner outdoors, ducked and dulled once you are inside;
+     a dog that is always too far away; and a fridge in every kitchen humming at
+     ALMOST the same pitch as the one next door — the entire game in one sound. */
+  function ensureAmb(){
+    if(!ctx||amb)return amb;
+    const src=ctx.createBufferSource();src.buffer=noiseBuf;src.loop=true;
+    const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=4200;bp.Q.value=0.8;
+    const g=ctx.createGain();g.gain.value=0;
+    src.connect(bp);bp.connect(g);g.connect(bus.world);
+    src.start();
+    const ac=ctx.createOscillator();ac.type='sawtooth';ac.frequency.value=62;
+    const acLp=ctx.createBiquadFilter();acLp.type='lowpass';acLp.frequency.value=200;
+    const acG=ctx.createGain();acG.gain.value=0;
+    ac.connect(acLp);acLp.connect(acG);acG.connect(bus.world);ac.start();
+    amb={g:g,bp:bp,acG:acG,acT:0,acOn:false};
+    return amb;
+  }
+  function ensureHums(){
+    if(!ctx||hums.length||typeof HOUSES==='undefined'||!HOUSES)return;
+    const n=HOUSES.length;
+    for(let i=0;i<n;i++){
+      const h=HOUSES[i];
+      /* Deterministic, not random: the same fridge must hum the same note every night,
+         or it is noise instead of a fact you can learn. */
+      const k=n>1?(i*2)/(n-1)-1:0;
+      const o=ctx.createOscillator();o.type='triangle';
+      o.frequency.value=CONST.AUD_HUM_HZ*(1+CONST.AUD_HUM_SPREAD*k);
+      const buzz=ctx.createOscillator();buzz.type='sawtooth';
+      buzz.frequency.value=o.frequency.value*2;
+      const bg=ctx.createGain();bg.gain.value=0.22;
+      const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=520;
+      const g=ctx.createGain();g.gain.value=0;
+      const pn=ctx.createStereoPanner?ctx.createStereoPanner():null;
+      o.connect(lp);buzz.connect(bg);bg.connect(lp);lp.connect(g);
+      if(pn){g.connect(pn);pn.connect(bus.world);}else g.connect(bus.world);
+      o.start();buzz.start();
+      hums.push({g:g,pn:pn,x:h.x-3.90,z:1.20,hz:o.frequency.value,house:h.id});
+    }
+  }
+
+  /* Driven from tick(dt) so the ambience advances at the same rate as the sim and a
+     test can step it deterministically. */
+  function update(dt){
+    if(!ctx)return;
+    if(!isFinite(dt)||dt<=0)dt=1/60;
+    const t=ctx.currentTime;
+    if(S.phase!=='house'){
+      setHeat(0);
+      if(amb){amb.g.gain.setTargetAtTime(0,t,0.4);amb.acG.gain.setTargetAtTime(0,t,0.4);}
+      for(let i=0;i<hums.length;i++)hums[i].g.gain.setTargetAtTime(0,t,0.4);
+      return;
+    }
+    setHeat(loudestHeat());
+    ensureAmb();ensureHums();
+    const px=player?player.position.x:0,pz=player?player.position.z:0;
+    const indoors=ceilAt(px,pz)>0;
+    // crickets duck AND dull indoors — a closed window is a lowpass filter
+    amb.g.gain.setTargetAtTime(CONST.AUD_AMB_GAIN*(indoors?0.22:1),t,0.5);
+    amb.bp.frequency.setTargetAtTime(indoors?1500:4200,t,0.5);
+    amb.acT-=dt;
+    if(amb.acT<=0){
+      amb.acOn=!amb.acOn;
+      amb.acT=amb.acOn?(18+Math.random()*14):(22+Math.random()*20);
+      amb.acG.gain.setTargetAtTime(amb.acOn?CONST.AUD_AMB_GAIN*(indoors?0.10:0.26):0,t,1.6);
+    }
+    for(let i=0;i<hums.length;i++){
+      const hm=hums[i];
+      // a fridge is a LOCAL detail: you have to be in the kitchen to compare them
+      const d=Math.hypot(px-hm.x,pz-hm.z);
+      let g=1-d/7.5; g=g<=0?0:g*g;
+      hm.g.gain.setTargetAtTime(CONST.AUD_HUM_GAIN*g,t,0.35);
+      if(hm.pn&&d>0.06)
+        hm.pn.pan.value=Math.max(-1,Math.min(1,
+          ((hm.x-px)*Math.cos(S.yaw)-(hm.z-pz)*Math.sin(S.yaw))/d))*CONST.AUD_PAN;
+    }
+    // the dog, occasionally, always too far away to matter
+    clock.dog-=dt;
+    if(clock.dog<=0){
+      clock.dog=26+Math.random()*40;
+      const p={g:indoors?0.10:0.22,pan:(Math.random()*2-1)*0.7,walls:0,d:0};
+      tone(p,CONST.AUD_AMB_GAIN*p.g*0.9,320,210,0.16,'world','sawtooth');
+      tone(p,CONST.AUD_AMB_GAIN*p.g*0.7,300,196,0.13,'world','sawtooth',0.26);
+    }
+    // the house settling — indoors only, and only ever a suggestion
+    clock.creak-=dt;
+    if(clock.creak<=0&&indoors){
+      clock.creak=30+Math.random()*45;
+      tone({g:0.16,pan:(Math.random()*2-1)*0.5,walls:1,d:0},
+           CONST.AUD_AMB_GAIN*0.13,120,86,0.55,'world','triangle');
+    }
+  }
+
+  /* ── non-positional cues ────────────────────────────────────────────────────
+     Everything that happens TO you rather than somewhere out in the world. */
+  const HERE={g:1,pan:0,walls:0,d:0};
+  const CUES={
+    stir:function(){
+      tone(HERE,0.30,300,240,0.30,'music','triangle');
+      tone(HERE,0.16,452,362,0.36,'music','triangle',0.05);},
+    wake:function(){
+      tone(HERE,0.40,196,132,0.55,'music','sawtooth');
+      tone(HERE,0.22, 98, 66,0.75,'music','sawtooth',0.02);},
+    seen:function(){
+      tone(HERE,0.45,880,110,0.70,'music','sawtooth');
+      burst(HERE,0.30,700,0.6,0.55,'music');},
+    caught:function(){
+      for(let i=0;i<3;i++)tone(HERE,0.34,320-i*70,150-i*40,0.5,'music','sawtooth',i*0.14);},
+    /* "A bright, wrong, 1960s-advert cue" (GDD 8). The wrongness is specific and not
+       just an off note: the third is a JUST-SHARP major third (+18 cents), so the
+       jingle sounds like it was recorded slightly too fast. */
+    day:function(){const f=523.25;
+      tone(HERE,0.26,f,        f,        0.30,'music','triangle');
+      tone(HERE,0.24,f*1.2725, f*1.2725, 0.30,'music','triangle',0.10);
+      tone(HERE,0.24,f*1.5,    f*1.5,    0.34,'music','triangle',0.20);
+      tone(HERE,0.20,f*2,      f*2,      0.46,'music','triangle',0.30);},
+    morning:function(){tone(HERE,0.20,392,523.25,0.42,'music','sine');},
+    doubt:function(){                                  // they noticed, and wondered
+      tone(HERE,0.26,660,990,0.34,'music','sine');
+      tone(HERE,0.14,990,1320,0.30,'music','sine',0.09);},
+    certain:function(){tone(HERE,0.30,240,150,0.60,'music','sawtooth');},
+    buy:function(){
+      tone(HERE,0.22,1046,1568,0.12,'foley','square');
+      tone(HERE,0.16,1568,2093,0.10,'foley','square',0.07);},
+    ui:function(){tone(HERE,0.10,880,880,0.05,'foley','sine');}
+  };
+  function cue(name){
+    if(!ctx)return false;
+    const fn=CUES[name];if(!fn)return false;
+    try{fn();}catch(e){return false;}
+    return true;
+  }
+
+  return {
+    arm:arm,resume:resume,
+    world:world,cue:cue,update:update,setHeat:setHeat,place:place,
+    get ctx(){return ctx;},
+    get buses(){return bus;},
+    get master(){return master;},
+    get drone(){return drone;},
+    get hums(){return hums;},
+    settings:set,
+    busGain:busGain,
+    voiceNames:function(){return Object.keys(VOICES);},
+    cueNames:function(){return Object.keys(CUES);},
+    set:function(k,v){
+      if(k==='mute')set.mute=!!v;
+      else if(set[k]!==undefined)set[k]=cl01(v);
+      else return false;
+      applyMix();persist();return true;
+    },
+    /* Test/diagnostic only: drop the graph so a suite can assert the pre-gesture
+       state. The game never calls this. */
+    _reset:function(){
+      if(ctx&&ctx.close){try{ctx.close();}catch(e){}}
+      ctx=null;master=null;drone=null;amb=null;dead=false;hums.length=0;
+      Object.keys(bus).forEach(k=>{delete bus[k];});
+    }
+  };
+})();
+
 /* ═════════════════════════ NIGHT ═════════════════════════
    Three pressures, all running at once (GDD 5.5):
      NOISE  accumulates per sleeper, attenuated by distance AND by walls between
@@ -2375,7 +2862,13 @@ function wallsBetween(ax,az,bx,bz){
   }
   return n;
 }
-function emitNoise(x,z,mag){
+/* `snd` names the voice the PLAYER hears; `mtl` picks its timbre for handled objects.
+   Sound is emitted here, ahead of the NIGHT.running guard, on purpose: you can hear
+   your own footsteps in the greybox and on a street where nobody is asleep. What the
+   guard controls is CONSEQUENCE, not audibility. Passing no `snd` is a design smell —
+   m9 asserts that every real call site names one. */
+function emitNoise(x,z,mag,snd,mtl){
+  if(snd)SFX.world(snd,x,z,mag,mtl);
   if(!NIGHT.running)return;
   for(let i=0;i<SLEEPERS.length;i++){
     const s=SLEEPERS[i];
@@ -2419,7 +2912,7 @@ function updateSleepers(dt){
     const th=wakeThreshold(s);
     if(s.state==='asleep'){
       if(s.noise>th){s.state='stirring';s.stir=CONST.STIR_TIME;s.sinceStir=0;
-        hint(s.name+' stirs. Go still.');}
+        SFX.cue('stir');hint(s.name+' stirs. Go still.');}
     }else if(s.state==='stirring'){
       s.stir-=dt;
       /* THE GRACE PERIOD. Escalation depends on what they hear WHILE sitting up —
@@ -2427,6 +2920,7 @@ function updateSleepers(dt){
          and made "go still and they settle" unreachable. */
       if(s.sinceStir>th*0.30){
         s.state='awake';s.awake=CONST.AWAKE_TIME;s.look=Math.PI*0.5;
+        SFX.cue('wake');
       }else if(s.stir<=0){
         s.state='asleep';
         s.noise=Math.min(s.noise,th*0.45);   // they've settled; don't re-trigger instantly
@@ -2452,6 +2946,7 @@ function onSeen(s){
   const r=RESIDENTS[s.res];
   r.suspicion=clamp((r.suspicion||0)+34,0,100);
   r.stress=clamp((r.stress||0)+20,0,100);
+  SFX.cue('seen');
   flash();
   endNight('seen',s.name+' is sitting up in the dark, looking straight at you. '+
     'You are out of the house before they find the lamp — but they know someone was here.');
@@ -2494,6 +2989,7 @@ function wifeNightTick(dt){
       WIFE.followT-=dh;
       if(WIFE.followT<=0){
         WIFE.following=false;
+        SFX.cue('caught');
         wifeAdd(CONST.FOLLOW_COST);
         endNight('followed','Dana finds you three doors down at four in the morning, '+
           'holding somebody else’s cereal. You have an explanation. It is not a good one.');
@@ -2665,6 +3161,7 @@ function blockActions(){
   return Object.keys(ACTIONS).filter(k=>ACTIONS[k].block.indexOf(b)>=0);
 }
 function startDay(){
+  SFX.cue('day');
   DAY.block=0;DAY.actions=CONST.ACTIONS_PER_BLOCK;DAY.log=[];
   GAME.watched=false;
   // payday / bills, once a week
@@ -2762,6 +3259,7 @@ function buyVariant(objId,idx){
   if(!how)return 'poor';
   GAME.bought[objId+'#'+idx]=true;
   INV.push({kind:it.kind,spec:it.spec,forId:objId,label:it.label,sim:it.sim});
+  SFX.cue('buy');
   return how;
 }
 
@@ -2820,7 +3318,7 @@ function hashStr(s){let h=2166136261;
 function scanObject(o){
   CATALOG[o.id]={kind:o.kind,spec:JSON.parse(JSON.stringify(o.spec)),
                  day:GAME.day,owner:o.owner,label:o.label};
-  emitNoise(o.spec._pos[0],o.spec._pos[2],CONST.N_SCAN);
+  emitNoise(o.spec._pos[0],o.spec._pos[2],CONST.N_SCAN,'scan');
   hint('Catalogued: '+PROP_KINDS[o.kind].alienName);
 }
 /* Shop stub. Real stores (stock rotation, money, travel, familiarity) are M6; the
@@ -2850,7 +3348,7 @@ function applyChange(o,newSpec,label){
   p.labels.push(label);
   o.spec=newSpec;
   respawnObject(o);
-  emitNoise(o.spec._pos[0],o.spec._pos[2],CONST.N_HANDLE);   // handling things is audible
+  emitNoise(o.spec._pos[0],o.spec._pos[2],CONST.N_HANDLE,'handle',(PROP_KINDS[o.kind]||{}).mtl);
 }
 function swapWith(o,idx){
   const mine=invFor(o.id);
@@ -3200,10 +3698,10 @@ function useDoor(d){
     d.locked=false;hint('The spare key turns. You are inside.');
   }
   setDoor(d,!d.open);
-  emitNoise(d.pos[0],d.pos[2],CONST.N_DOOR);
+  emitNoise(d.pos[0],d.pos[2],CONST.N_DOOR,'door');
 }
 function searchPlanter(p){
-  emitNoise(p.pos[0],p.pos[2],CONST.N_SEARCH);
+  emitNoise(p.pos[0],p.pos[2],CONST.N_SEARCH,'search');
   if(p.searched){hint('Nothing else under this one.');return;}
   p.searched=true;
   if(p.hasKey){
@@ -3326,6 +3824,8 @@ function showReport(reason,text){
      ' &middot; sightings '+GAME.sightings+'/'+CONST.SEEN_LIMIT+
      (GAME.sightings>=CONST.SEEN_LIMIT?' &mdash; <b>the street is watching now</b>':'')+
      '</div>';
+  SFX.cue(lines.some(L=>L.r.band==='CERTAINTY')?'certain'
+         :lines.some(L=>L.r.band==='DOUBT')  ?'doubt':'morning');
   $('report-body').innerHTML=h;
   exitFocus();
   go('s-report');S.menuOpen=true;
@@ -3474,6 +3974,7 @@ addEventListener('wheel',e=>{
 addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='escape'){
+    if($('s-sound').classList.contains('on')){go(soundBack);return;}
     if(S.focus)exitFocus();
     else if(S.menuOpen)closeMenu();
     else if(PLAYABLE())openMenu();
@@ -3562,6 +4063,24 @@ function toTitle(){
 $('btn-start').addEventListener('click',startGreybox);
 $('btn-house').addEventListener('click',startHouse);
 $('btn-resume').addEventListener('click',closeMenu);
+$('btn-sound').addEventListener('click',function(){openSound('s-pause');});
+$('btn-sound-title').addEventListener('click',function(){openSound('s-title');});
+$('btn-sound-back').addEventListener('click',function(){go(soundBack);});
+$('mx-mute').addEventListener('change',function(){
+  SFX.set('mute',this.checked);syncMix();
+  if(!this.checked)SFX.cue('ui');          // unmuting should make a sound. Muting must not.
+});
+/* Each slider previews its OWN bus, so you can hear what you are setting. Preview
+   fires on 'change' (pointer released), not on 'input' - previewing every pixel of
+   a drag is a machine-gun. */
+[['music','mx-music','doubt'],['world','mx-world','ui'],['foley','mx-foley','buy']]
+.forEach(function(p){
+  $(p[1]).addEventListener('input',function(){
+    SFX.set(p[0],(+this.value)/100);
+    $(p[1]+'-v').textContent=Math.round(+this.value)+'%';
+  });
+  $(p[1]).addEventListener('change',function(){SFX.cue(p[2]);});
+});
 $('btn-title').addEventListener('click',toTitle);
 $('btn-report-ok').addEventListener('click',function(){
   if(GAME.over)showEnding();else startDay();
@@ -3606,11 +4125,41 @@ function tick(dt){
   if(!S.menuOpen&&!S.focus){movePlayer(dt);animBody(dt);}
   if(!S.menuOpen&&S.phase==='house')nightTick(dt);
   updateCamera(dt);
+  SFX.update(dt);
   for(let i=0;i<DOORS.length;i++){
     const d=DOORS[i];
     if(d.targetRot!==undefined)
       d.pivot.rotation.y+=(d.targetRot-d.pivot.rotation.y)*Math.min(1,dt*7);
   }
+}
+
+/* ---- SOUND UI -------------------------------------------------------------
+   A browser will not create an AudioContext before a real user gesture, so arm on
+   the first one of ANY kind. resume() runs on every gesture, not just the first: a
+   backgrounded tab gets suspended again and would otherwise come back silent. */
+function armAudio(){SFX.arm();SFX.resume();}
+['pointerdown','keydown','click','touchstart'].forEach(function(ev){
+  addEventListener(ev,armAudio,{capture:true,passive:true});
+});
+
+/* The mixer is a .screen, so go() hands it exclusivity for free. It opens from the
+   title OR from the pause menu, so it remembers where BACK goes. */
+let soundBack='s-pause';
+function syncMix(){
+  const st=SFX.settings;
+  $('mx-mute').checked=st.mute;
+  $('mix').classList.toggle('muted',st.mute);
+  [['music','mx-music'],['world','mx-world'],['foley','mx-foley']].forEach(function(p){
+    const pct=Math.round(st[p[0]]*100);
+    $(p[1]).value=pct;
+    $(p[1]+'-v').textContent=pct+'%';
+  });
+}
+function openSound(from){
+  soundBack=from||'s-pause';
+  SFX.arm();          // opening this panel IS a gesture, and the previews need audio
+  syncMix();
+  go('s-sound');
 }
 
 /* ═════════════════════════ BOOT ═════════════════════════ */
@@ -3653,6 +4202,8 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
   // ── M7: her ladder acting, fractures, marking ──
   FRACTURES,fireFractures,markOwned,relocate,
   wifeTierIndex,planWifeNight,wifeNightTick,isHome,
+  // ── M9: audio ──
+  SFX,AUDIO_KEY,syncMix,openSound,armAudio,
   // ── M2: the Doubt Curve ──
   SPEC:{axisDist,axesOf,specDelta,randomSpec,mutateSpec,variantNear,describeDiff,describeDiffs},
   PROP_KINDS,RESIDENTS,DOUBT,

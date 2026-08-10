@@ -32,14 +32,20 @@ something *almost* the same. Every morning they wake up and look at it.
 ## Notes for the playtester
 
 - It's a **vertical slice**, not a finished game: four houses, six neighbours,
-  12 kinds of object, seven nights. **There is no audio yet.**
+  12 kinds of object, seven nights.
+- **Play it with sound on.** The low tone you can hear during the night is not music —
+  it rises as the nearest sleeper gets closer to waking, and it's the only warning you
+  get while you're looking at them instead of at the HUD. Sliders are on the title
+  screen and in the pause menu.
 - A run ends when the street collapses (win), when the seven nights run out, when
   your wife catches you three times, or when the neighbourhood gets suspicious enough
   to compare notes.
 - Sneak. Sound carries through doorways but not through walls, and June Hoyt is a
   light sleeper.
+- Every house's fridge hums at a slightly different pitch. That is on purpose.
 - Things you should tell us about: does the *doubt* band feel findable, or does it
-  feel like a coin flip? Is a night long enough? Does anything read as a bug?
+  feel like a coin flip? Is a night long enough? Can you hear a sleeper getting close
+  to waking in time to stop? Does anything read as a bug?
 
 Single HTML file, no installer, no external requests — it runs entirely in the tab.
 Desktop browser with a mouse and keyboard; it is not built for phones.
