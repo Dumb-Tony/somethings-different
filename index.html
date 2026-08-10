@@ -44,6 +44,33 @@ h1 span{color:var(--alien)}
   background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 20px;color:var(--dim)}
 .keys b{color:var(--text);font-family:var(--font-mono);font-size:12px;text-align:right}
 
+/* ── the guide rail (M11) ────────────────────────────────────────────────────
+      Sits ABOVE .screen (z 50) on purpose: the day and shop overlays are gameplay
+      and the objective has to survive them. updateGuide() hides it on the menus. */
+#guide{position:fixed;left:14px;top:14px;z-index:60;max-width:300px;display:none;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--alien);
+  border-radius:11px;padding:11px 15px 12px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+#guide.on{display:block}
+#guide.done{border-left-color:var(--warm)}
+#guide-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:1.5px;
+  color:var(--alien);margin-bottom:3px}
+#guide.done #guide-lbl{color:var(--warm)}
+#guide-step{font-weight:700;font-size:14px;line-height:1.35;color:var(--text)}
+#guide-why{font-size:12px;line-height:1.45;color:var(--dim);margin-top:5px}
+#guide b{color:var(--paper);font-family:var(--font-mono);font-size:12px}
+
+/* the three bands, named in the colours the morning report uses (M11 intro + glosses) */
+.k-miss{color:var(--dim);font-weight:800}
+.k-doubt{color:var(--alien);font-weight:800}
+.k-cert{color:var(--coral);font-weight:800}
+.intro-rule{display:flex;flex-direction:column;gap:7px;max-width:560px;text-align:left;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 20px;
+  font-size:14px;line-height:1.5;color:var(--dim)}
+.intro-rule b{color:var(--text)}
+.rp-gloss{font-size:12px;line-height:1.5;color:var(--dim);border-left:2px solid var(--line);
+  padding:6px 0 6px 10px;margin-top:7px}
+.rp-gloss b{color:var(--paper)}
+
 /* ── the mixer (M9). The only <input> UI in the game, so it carries its own
       styling rather than a general form system that nothing else would use. ──── */
 .mix{display:grid;grid-template-columns:auto 190px 42px;gap:13px 14px;align-items:center;
@@ -81,7 +108,8 @@ h1 span{color:var(--alien)}
   border-radius:10px;padding:8px 12px;white-space:pre;pointer-events:none}
 #dbg.on{display:block}
 #dbg i{color:var(--alien);font-style:normal}
-#build-tag{position:fixed;top:12px;left:14px;z-index:20;font-size:10px;font-weight:700;color:var(--dim);
+/* bottom-left since M11 — the guide rail owns the top-left corner now */
+#build-tag{position:fixed;bottom:12px;left:14px;z-index:20;font-size:10px;font-weight:700;color:var(--dim);
   letter-spacing:1.6px;background:rgba(10,9,18,.7);border:1px solid var(--line);border-radius:20px;padding:6px 12px}
 #hint{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);z-index:30;background:rgba(10,9,18,.9);
   border:1px solid var(--line);border-radius:14px;padding:9px 18px;font-size:13px;font-weight:700;opacity:0;
@@ -201,7 +229,7 @@ body.night #grade{opacity:1}
 .ds-dim{color:var(--dim)}
 </style>
 
-<div id="build-tag">SOMETHING'S DIFFERENT · M8 · ARDSLEY COURT</div>
+<div id="build-tag">SOMETHING'S DIFFERENT · M11 · ARDSLEY COURT</div>
 
 <div id="hud">
   <div class="pill" id="clock">🌙 <b id="clock-v">23:00</b></div>
@@ -217,17 +245,25 @@ body.night #grade{opacity:1}
 <div id="prompt"></div>
 <div id="focus"></div>
 
+<!-- the guide rail (M11). NOT a .screen — it must survive go(). -->
+<div id="guide">
+  <div id="guide-lbl">OBJECTIVE</div>
+  <div id="guide-step"></div>
+  <div id="guide-why"></div>
+</div>
+
 <!-- TITLE — ships with class "screen on" so it covers the canvas from the first paint
      and doubles as the loading screen (Chameleon boot pattern). -->
 <div class="screen on" id="s-title">
   <h1>SOMETHING'S <span>DIFFERENT</span></h1>
-  <div class="sub">Milestone 4 &mdash; the Hoyt house.<br>
-    Find the spare key. Get inside. Scan what they own, requisition a near-match,
-    swap it &mdash; then see what they make of it in the morning.</div>
-  <button class="big-btn" id="btn-house">12 ARDSLEY CT</button>
-  <div style="display:flex;gap:10px">
-    <button class="ghost-btn" id="btn-start">engine greybox</button>
+  <div class="sub">A suburban street, seven nights, and one very patient alien.<br>
+    Get into their houses. Swap their things for things that are <i>almost</i> the same.
+    Make them doubt themselves &mdash; without ever making them sure.</div>
+  <button class="big-btn" id="btn-house">GO OUT TONIGHT</button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button class="ghost-btn" id="btn-guide">GUIDE: ON</button>
     <button class="ghost-btn" id="btn-sound-title">sound</button>
+    <button class="ghost-btn" id="btn-start">engine greybox</button>
   </div>
   <div class="keys">
     <b>W A S D</b><span>move (camera-relative)</span>
@@ -296,8 +332,60 @@ body.night #grade{opacity:1}
     <button class="ghost-btn" id="btn-save">SAVE</button>
     <button class="ghost-btn" id="btn-load">LOAD</button>
   </div>
-  <button class="ghost-btn" id="btn-sound">SOUND</button>
+  <div style="display:flex;gap:10px">
+    <button class="ghost-btn" id="btn-sound">SOUND</button>
+    <button class="ghost-btn" id="btn-controls">CONTROLS</button>
+  </div>
   <button class="ghost-btn" id="btn-title">BACK TO TITLE</button>
+</div>
+
+<!-- INTRO (M11). The one place the game states its own premise. Shown once, before
+     the first night; the title's GUIDE toggle turns it (and the rail) off. -->
+<div class="screen" id="s-intro">
+  <h1>YOU ARE NOT <span>STEVE MAREK</span></h1>
+  <div class="sub">You woke up in his body eleven days ago. His wife has not noticed.
+    His neighbours have not noticed. You would like to find out what else they
+    would not notice.</div>
+  <div class="intro-rule">
+    <div><b>Every night, change one thing in somebody&rsquo;s house.</b></div>
+    <div><span class="k-miss">TOO SIMILAR</span> and they walk straight past it. Nothing happens.</div>
+    <div><span class="k-cert">TOO DIFFERENT</span> and they are <b>certain</b> something is wrong.
+      That is Suspicion, and Suspicion is how you lose.</div>
+    <div><span class="k-doubt">IN BETWEEN</span> and they doubt <b>themselves</b>.
+      That is the entire game.</div>
+    <div class="ds-dim">The scanner will tell you which one you are about to cause,
+      before you buy it. It does not lie.</div>
+  </div>
+  <button class="big-btn" id="btn-intro-go">GO OUT</button>
+  <button class="ghost-btn" id="btn-intro-skip">I&rsquo;d rather work it out myself</button>
+</div>
+
+<!-- CONTROLS (M11). The title screen lists the basics; this adds the half that only
+     exists once you are crouched over somebody's mug. -->
+<div class="screen" id="s-controls">
+  <h1>CONTROLS</h1>
+  <div class="keys">
+    <b>W A S D</b><span>move (camera-relative)</span>
+    <b>Shift / Ctrl</b><span>run / sneak &mdash; sneaking is far quieter</span>
+    <b>Space</b><span>jump</span>
+    <b>Drag LMB</b><span>look around</span>
+    <b>Wheel</b><span>zoom</span>
+    <b>E</b><span>examine / search a planter / open a door</span>
+    <b>Tab</b><span>dossier &mdash; catalog, bag, their state of mind</span>
+    <b>M</b><span>go home &mdash; ends the night, shows you the morning</span>
+    <b>Esc</b><span>pause</span>
+    <b>F3</b><span>debug readout</span>
+  </div>
+  <div class="sub" style="font-size:13px">Holding an object &mdash; that is, once you press <b>E</b> on one:</div>
+  <div class="keys">
+    <b>F</b><span>scan it into the catalog (you cannot buy what you have not recorded)</span>
+    <b>R</b><span>requisition variants of it</span>
+    <b>1 &hellip; 9</b><span>swap in one of the matches in your bag</span>
+    <b>&larr; &uarr; &darr; &rarr;</b><span>nudge it 3cm &mdash; moving a thing counts too</span>
+    <b>Z / X</b><span>turn it</span>
+    <b>E</b><span>step back</span>
+  </div>
+  <button class="ghost-btn" id="btn-controls-back">BACK</button>
 </div>
 
 <!-- SOUND (M9). A .screen, so go() gives it exclusivity for free; BACK returns to
@@ -2368,6 +2456,7 @@ const n2=v=>'<i>'+v.toFixed(2)+'</i>', n3=v=>'<i>'+v.toFixed(3)+'</i>';
 function updateHUD(dt){
   hudT-=dt;if(hudT>0)return;hudT=0.1;
   updatePrompt();
+  GUIDE.tick();          // reads game state; never drives it
   $('mode-v').textContent=S.moveMode.toUpperCase();
   if(S.phase==='house'){
     $('clock-v').textContent=clockString();
@@ -2408,6 +2497,134 @@ function updateHUD(dt){
     'apex   '+n3(PHYS.apex(CONST.JUMP_V,CONST.GRAV))+' m   reach '+n3(reach)+' m\n'+
     'fps    <i>'+S.fps.toFixed(0)+'</i>';
 }
+
+/* ═════════════════════════ GUIDE ═════════════════════════
+   M11. Ten milestones in, nobody had played this end to end, and everything a new
+   player needs — that a spare key is under a planter, that you cannot order a copy of
+   something you have not scanned, that DOUBT is the thing you are trying to cause and
+   CERTAINTY is how you lose — existed only in a README on GitHub. This moves that
+   knowledge into the game.
+
+   The chain is a list of steps with a `done()` predicate read off REAL game state, NOT
+   a script that fires on keypresses. Do things in an unexpected order and it skips
+   ahead instead of getting stuck — which matters, because the loop has real freedom in
+   it: you can scan four things before opening a door, or shop at three shops, or start
+   with the Vances instead of the Hoyts. Every predicate is therefore written against
+   "any neighbour", not against the house the text happens to suggest. */
+const GUIDE_KEY='sd_guide_v1';
+const GUIDE_HIDE_ON=['s-title','s-pause','s-sound','s-controls','s-intro',
+                     's-report','s-end','s-dossier','s-talk'];
+const GUIDE_STEPS=[
+  {id:'leave',
+   t:'Cross the street to <b>12 Ardsley Ct</b>',
+   why:'You are standing outside your own house. The Hoyts are two doors down &mdash; '+
+       'but any of the three will do.',
+   done:()=>!!player&&HOUSES.some(h=>!h.yours&&Math.abs(player.position.x-h.x)<5.5)},
+  {id:'key',
+   t:'Search the planters by the porch &mdash; <b>E</b>',
+   why:'There are three of them, and people leave a spare key under one. People are '+
+       'extraordinary.',
+   /* "or you are already inside" — a step must never insist on the route you took,
+      only on the state it was there to reach. */
+   done:()=>Object.keys(GAME.keys).length>0||DOORS.some(d=>d.open&&!d.locked)},
+  {id:'in',
+   t:'Let yourself in &mdash; <b>E</b> at the front door',
+   why:'Hold <b>Ctrl</b> to sneak once you are inside. Two of them are asleep upstairs '+
+       'and sound carries through a doorway.',
+   done:()=>DOORS.some(d=>d.open&&!d.locked)},
+  {id:'scan',
+   t:'Find something of theirs and scan it &mdash; <b>E</b>, then <b>F</b>',
+   why:'You cannot order a copy of a thing you have not recorded. That gate is the '+
+       'whole reason this is a job and not a menu.',
+   done:()=>Object.keys(CATALOG).length>0},
+  {id:'home',
+   t:'Go home &mdash; <b>M</b>',
+   why:'Nothing else can happen tonight. The shops open in the morning.',
+   done:()=>!NIGHT.running},
+  {id:'shop',
+   t:'Drive to a shop and buy something <i>almost</i> the same',
+   why:'Three shops, and they stock different amounts of wrong. The scanner forecasts '+
+       'what each one will do to its owner &mdash; you want the ones that say DOUBT.',
+   done:()=>INV.length>0},
+  {id:'back',
+   t:'Get through the day, then go back out',
+   why:'Being a convincing husband costs you the time you wanted for other things. '+
+       'That is the trade.',
+   done:()=>NIGHT.running},
+  {id:'swap',
+   t:'Swap it in &mdash; <b>E</b> on the object, then <b>1</b>',
+   why:'Put the copy exactly where the original was. Nudging things with the arrow '+
+       'keys counts as a change too.',
+   done:()=>PENDING.length>0},
+  {id:'out',
+   t:'Get home before dawn &mdash; <b>M</b>',
+   why:'Then read the morning report. That is where you find out what they made of it.',
+   done:()=>!NIGHT.running},
+];
+const GUIDE=(function(){
+  const pref={on:true,introSeen:false};
+  try{
+    const d=JSON.parse(localStorage.getItem(GUIDE_KEY)||'null');
+    if(d&&typeof d==='object'){
+      if(typeof d.on==='boolean')pref.on=d.on;
+      if(typeof d.introSeen==='boolean')pref.introSeen=d.introSeen;
+    }
+  }catch(e){}
+  function persist(){try{localStorage.setItem(GUIDE_KEY,JSON.stringify(pref));}catch(e){}}
+
+  function step(){return GAME.guideDone?null:(GUIDE_STEPS[GAME.guideStep||0]||null);}
+  /* Advance past every step that is ALREADY satisfied, not just the current one, so an
+     unexpected order collapses instead of stalling. Returns how many it advanced. */
+  function advance(){
+    if(!pref.on||GAME.guideDone)return 0;
+    let moved=0;
+    for(let guard=0;guard<GUIDE_STEPS.length+1;guard++){
+      const s=GUIDE_STEPS[GAME.guideStep||0];
+      if(!s){GAME.guideDone=true;break;}
+      let ok=false;
+      try{ok=!!s.done();}catch(e){ok=false;}
+      if(!ok)break;
+      GAME.guideStep=(GAME.guideStep||0)+1;moved++;
+      if(GAME.guideStep>=GUIDE_STEPS.length){GAME.guideDone=true;break;}
+    }
+    if(moved){SFX.cue('ui');render();}
+    return moved;
+  }
+  function render(){
+    const el=$('guide');if(!el)return;
+    const hidden=!pref.on||S.phase!=='house'||
+      GUIDE_HIDE_ON.some(id=>{const n=document.getElementById(id);
+                              return n&&n.classList.contains('on');});
+    if(hidden){el.classList.remove('on');return;}
+    const s=step();
+    if(!s){
+      /* The chain is finished. Say so once, in the language of the thing it taught,
+         and then get out of the way for good. */
+      el.classList.add('done');
+      $('guide-lbl').textContent='THAT IS THE LOOP';
+      $('guide-step').innerHTML='Now do it to the whole street.';
+      $('guide-why').innerHTML='Seven nights. Six neighbours. Collapse enough of them '+
+        'and you win &mdash; get caught being <i>certain</i> too often and you do not.';
+    }else{
+      el.classList.remove('done');
+      $('guide-lbl').textContent='OBJECTIVE '+((GAME.guideStep||0)+1)+'/'+GUIDE_STEPS.length;
+      $('guide-step').innerHTML=s.t;
+      $('guide-why').innerHTML=s.why||'';
+    }
+    el.classList.add('on');
+  }
+  return {
+    tick(){advance();render();},
+    render:render,advance:advance,step:step,
+    steps:GUIDE_STEPS,
+    get on(){return pref.on;},
+    get introSeen(){return pref.introSeen;},
+    setOn(v){pref.on=!!v;persist();render();},
+    markIntroSeen(){pref.introSeen=true;persist();},
+    /* Tests and "play again" both need a clean chain without clearing preferences. */
+    reset(){GAME.guideStep=0;GAME.guideDone=false;render();}
+  };
+})();
 
 /* ═════════════════════════ AUDIO ═════════════════════════
    WebAudio, synthesised from nothing — no files, no fetches. The page has to stay a
@@ -3407,7 +3624,11 @@ function pickScene(){
 const CATALOG={},INV=[],PENDING=[];
 const GAME={day:1,hasSpareKey:false,sightings:0,
   bank:140,cash:0,hk:0,week:1,weekday:0,wagePenalty:0,
-  bought:{},scenesSeen:{},watched:false,keys:{}};
+  bought:{},scenesSeen:{},watched:false,keys:{},
+  /* M11 — run state, so the guide and the one-off explanations survive a save.
+     The player's PREFERENCE (guide on/off, intro seen) is not here: that lives in
+     localStorage like the audio mix, because it must outlive any single run. */
+  guideStep:0,guideDone:false,glossed:{}};
 const REQ_TARGETS=[97,92,80];
 
 function hashStr(s){let h=2166136261;
@@ -3886,6 +4107,19 @@ function updatePrompt(){
 }
 
 /* ═════════════════════════ REPORT / DOSSIER ═════════════════════════ */
+/* Shown once per run, the first time each band actually happens to you (M11). */
+const BAND_GLOSS={
+  MISSED:'<b class="k-miss">MISSED</b> &mdash; too similar to register. It cost you '+
+    'nothing and gained you nothing, and the object is a little less fresh now, so the '+
+    'same trick works slightly less well on it next time.',
+  DOUBT:'<b class="k-doubt">DOUBT is the thing you are here for.</b> They noticed, could '+
+    'not explain it, and blamed themselves. Enough of this and a person comes apart '+
+    '&mdash; collapse enough of the street and you win.',
+  CERTAINTY:'<b class="k-cert">CERTAINTY is the losing currency.</b> They are sure '+
+    'something is wrong, so that landed as Suspicion instead of Doubt &mdash; and they '+
+    'have now MARKED the object. Its doubt window has collapsed, so the swaps that used '+
+    'to be safe on it will make witnesses instead.'
+};
 function showReport(reason,text){
   const lines=doMorning();
   let h='';
@@ -3912,6 +4146,13 @@ function showReport(reason,text){
       h+='<div class="rp-say">'+L.name+' KNOWS. Suspicion +'+r.suspicion.toFixed(1)+
          ' (now '+L.suspNow.toFixed(1)+'). They have marked it.</div>';
     h+='</div>';
+    /* The FIRST time each band happens to you, say what it means. A similarity
+       percentage and a delta are meaningless until somebody tells you which
+       direction is winning (M11). Once per run, then never again. */
+    if(!GAME.glossed[r.band]){
+      GAME.glossed[r.band]=1;
+      h+='<div class="rp-gloss">'+BAND_GLOSS[r.band]+'</div>';
+    }
   });
   (GAME.lastFractures||[]).forEach(f=>{
     h+='<div class="rp-item rp-frac"><div class="rp-band">FRACTURE &middot; DOUBT '+f.at+
@@ -4089,6 +4330,8 @@ addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='escape'){
     if($('s-sound').classList.contains('on')){go(soundBack);return;}
+    if($('s-controls').classList.contains('on')){go('s-pause');return;}
+    if($('s-intro').classList.contains('on')){return;}   // read it; it is four lines
     if(S.focus)exitFocus();
     else if(S.menuOpen)closeMenu();
     else if(PLAYABLE())openMenu();
@@ -4154,6 +4397,7 @@ function startHouse(){
   GAME.bank=140;GAME.cash=0;GAME.hk=0;GAME.week=1;GAME.weekday=0;
   GAME.wagePenalty=0;GAME.bought={};GAME.scenesSeen={};GAME.watched=false;GAME.keys={};
   GAME.over=null;GAME.lastFractures=[];
+  GAME.guideStep=0;GAME.guideDone=false;GAME.glossed={};   // a new run re-teaches (M11)
   WIFE.susp=0;DAY.block=0;DAY.actions=CONST.ACTIONS_PER_BLOCK;DAY.log=[];
   Object.keys(RESIDENTS).forEach(id=>{
     const r=RESIDENTS[id];r.doubt=0;r.suspicion=0;r.stress=0;r.beats=0;
@@ -4164,7 +4408,15 @@ function startHouse(){
   go(null);
   $('hud').classList.add('on');
   $('dbg').classList.toggle('on',S.showDbg);
+  GUIDE.render();
   hint('12 Ardsley Ct. The front door is locked — they keep a spare by the porch.');
+}
+/* The title button goes through here, not straight to startHouse(), so the premise
+   card can come first. startHouse() itself stays clean — every test calls it directly
+   and must not have a screen thrown up in front of the world it just built. */
+function beginRun(){
+  if(GUIDE.on&&!GUIDE.introSeen){go('s-intro');return;}
+  startHouse();
 }
 function toTitle(){
   S.phase='idle';S.menuOpen=false;
@@ -4175,7 +4427,17 @@ function toTitle(){
 }
 
 $('btn-start').addEventListener('click',startGreybox);
-$('btn-house').addEventListener('click',startHouse);
+$('btn-house').addEventListener('click',beginRun);
+
+/* ── guide + controls wiring (M11) ── */
+function syncGuideBtn(){$('btn-guide').textContent='GUIDE: '+(GUIDE.on?'ON':'OFF');}
+syncGuideBtn();
+$('btn-guide').addEventListener('click',function(){GUIDE.setOn(!GUIDE.on);syncGuideBtn();});
+$('btn-intro-go').addEventListener('click',function(){GUIDE.markIntroSeen();startHouse();});
+$('btn-intro-skip').addEventListener('click',function(){
+  GUIDE.markIntroSeen();GUIDE.setOn(false);syncGuideBtn();startHouse();});
+$('btn-controls').addEventListener('click',function(){go('s-controls');});
+$('btn-controls-back').addEventListener('click',function(){go('s-pause');});
 $('btn-resume').addEventListener('click',closeMenu);
 $('btn-sound').addEventListener('click',function(){openSound('s-pause');});
 $('btn-sound-title').addEventListener('click',function(){openSound('s-title');});
@@ -4315,6 +4577,8 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
   shopStock,predict,buyVariant,pickScene,showDay,openShop,openTalk,
   // ── M10: the stores ──
   STORES,storeById,storeHas,
+  // ── M11: onboarding ──
+  GUIDE,GUIDE_STEPS,GUIDE_KEY,BAND_GLOSS,beginRun,
   // ── M7: her ladder acting, fractures, marking ──
   FRACTURES,fireFractures,markOwned,relocate,
   wifeTierIndex,planWifeNight,wifeNightTick,isHome,

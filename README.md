@@ -15,6 +15,10 @@ something *almost* the same. Every morning they wake up and look at it.
 - Land in the narrow gap between the two and they **doubt themselves**. That's the
   whole game.
 
+**The game explains itself now** — there's a premise card before the first night and a
+running objective in the corner that walks you through a complete night → day → night.
+If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
+
 ## Controls
 
 | | |
