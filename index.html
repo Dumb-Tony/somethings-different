@@ -229,7 +229,7 @@ body.night #grade{opacity:1}
 .ds-dim{color:var(--dim)}
 </style>
 
-<div id="build-tag">SOMETHING'S DIFFERENT · M12 · ARDSLEY COURT</div>
+<div id="build-tag">SOMETHING'S DIFFERENT · M13 · ARDSLEY COURT</div>
 
 <div id="hud">
   <div class="pill" id="clock">🌙 <b id="clock-v">23:00</b></div>
@@ -270,7 +270,7 @@ body.night #grade{opacity:1}
     <b>Shift</b><span>run</span>
     <b>Ctrl</b><span>sneak</span>
     <b>Space</b><span>jump</span>
-    <b>Drag LMB</b><span>orbit camera</span>
+    <b>Mouse</b><span>look around (click once to capture the cursor)</span>
     <b>Wheel</b><span>zoom</span>
     <b>E</b><span>examine / search / open</span>
     <b>Tab</b><span>dossier &mdash; catalog, bag, their state of mind</span>
@@ -368,7 +368,7 @@ body.night #grade{opacity:1}
     <b>W A S D</b><span>move (camera-relative)</span>
     <b>Shift / Ctrl</b><span>run / sneak &mdash; sneaking is far quieter</span>
     <b>Space</b><span>jump</span>
-    <b>Drag LMB</b><span>look around</span>
+    <b>Mouse</b><span>look around (click once to capture the cursor)</span>
     <b>Wheel</b><span>zoom</span>
     <b>E</b><span>examine / search a planter / open a door</span>
     <b>Tab</b><span>dossier &mdash; catalog, bag, their state of mind</span>
@@ -482,11 +482,22 @@ const CONST={
   CAM_CEIL_PAD: 0.18,   // keep the camera this far below the ceiling
   CAM_OCC_MIN_TOP:0.50, // colliders shorter than this never push the camera
   CAM_OCC_PULL: 0.06,   // pull back 6% off the surface it hit
-  DRAG_YAW    : 0.005,  // rad per CSS pixel
+  /* M13: mouse look is POINTER-LOCKED. LOOK_SENS is radians per unit of raw mouse
+     movement — a different quantity from DRAG_*, which are per CSS pixel and now only
+     serve the fallback path for a browser that refuses the lock. */
+  LOOK_SENS   : 0.0022, // rad per mouse unit, yaw
+  LOOK_PITCH  : 0.80,   // pitch sensitivity as a fraction of yaw's — slightly calmer
+                        // vertically, which is the near-universal convention
+  DRAG_YAW    : 0.005,  // rad per CSS pixel (fallback only)
   DRAG_PITCH  : 0.004,
   BODY_ALIGN  : 12,     // shortest-arc body turn rate toward camera-forward (dt*n)
   // ── world ─────────────────────────────────────────────
   WALL_H      : 2.60,   // interior ceiling height
+  ROOM_SCALE  : 1.55,   // M13. Multiplies the DISTANCES in the authored floorplan,
+                        // never the furniture sizes or any height. At 1.0 the house
+                        // was 9x7m with 14 m2 walkable, a median clearance of 0.24m,
+                        // and a lounge you could not physically walk into. Raising
+                        // this is the one dial for "there is no room to move".
   WALL_T      : 0.12,   // wall thickness
   DT_MAX      : 0.10,   // main-loop dt clamp — the ONLY bound on a fall step
   // ── the Doubt Curve (GDD 4) — the spine of the game ───
@@ -2223,7 +2234,9 @@ const DOUBT={
 /* ═════════════════════════ STATE ═════════════════════════ */
 const S={
   phase:'idle',            // 'idle' | 'greybox' | 'house'
-  keys:{}, menuOpen:false, orbiting:false, focus:null,
+  /* orbiting = the mouse is captured and turning the camera (M13). dragging = the
+     fallback click-drag, only used when a browser refuses pointer lock. */
+  keys:{}, menuOpen:false, orbiting:false, dragging:false, focus:null,
   // physics — S.py is AUTHORITATIVE feet height; player.position.y is DISPLAY only
   py:0, vy:0, grounded:true,
   mvx:0, mvz:0, speedNorm:0, moveMode:'walk', wallHit:null,
@@ -2706,8 +2719,17 @@ let CUR_HOUSE=null;
    and, above all, WHOSE things are in it. */
 function buildHouse(def,rng){
   OX=def.x;CUR_HOUSE=def.id;
-  const HW=4.5,HD=3.5,H=CONST.WALL_H,T=CONST.WALL_T;
-  const YARD={minX:-5.5,maxX:5.5,minZ:-9.0,maxZ:-HD};
+  /* M13 - THE FLOORPLAN BELOW IS IN LAYOUT UNITS, not metres. _p() converts.
+     Furniture SIZES and all Y heights stay real-world (a sofa is still 2.1m wide, a
+     counter still 0.92m high); only the distances BETWEEN things grow. That is
+     exactly what "barely room to move" needed.
+     Measured before this: 14.0 m2 walkable of a 63 m2 interior, median clearance
+     0.24m, and the lounge and bedroom were UNREACHABLE ON FOOT - the sofa's inflated
+     collider left a 1cm gap at the lounge door. Every test that "went" to the bedroom
+     teleported the player, so nothing caught it. tools/_space.js measures all of it. */
+  const RS=CONST.ROOM_SCALE,_p=v=>v*RS;
+  const HW=_p(4.5),HD=_p(3.5),H=CONST.WALL_H,T=CONST.WALL_T;
+  const YARD={minX:_p(-5.5),maxX:_p(5.5),minZ:_p(-9.0),maxZ:-HD};
   CEIL_ZONES.push({minX:-HW+OX,maxX:HW+OX,minZ:-HD,maxZ:HD,y:H});
 
   // ── ground: lawn outside, boards inside, tile in the kitchen ──
@@ -2721,7 +2743,7 @@ function buildHouse(def,rng){
   surf(YARD.maxX-YARD.minX,YARD.maxZ-YARD.minZ,0,(YARD.minZ+YARD.maxZ)/2,0.001,
        tiled(texGrass(),9,5));
   surf(HW*2,HD*2,0,0,0.002,tiled(texBoards(28),7,6));
-  surf(HW,HD*2-1.6,-HW/2,0.95,0.004,tiled(texTile(38,32),5,5));       // kitchen tile
+  surf(HW,HD-_p(-1.6),-HW/2,(_p(-1.6)+HD)/2,0.004,tiled(texTile(38,32),5,5)); // kitchen tile
   const ceil=new THREE.Mesh(new THREE.PlaneGeometry(HW*2,HD*2),
     new THREE.MeshLambertMaterial({map:tiled(texPaint(35,0.10,0.80),3,3)}));
   ceil.rotation.x=Math.PI/2;ceil.position.set(OX,H,0);scene.add(ceil);envMeshes.push(ceil);
@@ -2730,41 +2752,42 @@ function buildHouse(def,rng){
      the house readable while the walls still cast the shadow bars that sell it. */
   box(HW*2+0.6,0.20,HD*2+0.6,'#3b2d26',0,H+0.10,0,{collide:false,cast:false,tag:'roof'});
   box(HW*2+0.3,0.62,HD*1.0,'#4a382e',0,H+0.44,0,{collide:false,cast:false,tag:'roofridge'});
-  box(0.45,1.05,0.45,'#514038',-3.2,H+0.75,1.4,{collide:false,cast:false,tag:'chimney'});
+  box(0.45,1.05,0.45,'#514038',_p(-3.2),H+0.75,_p(1.4),{collide:false,cast:false,tag:'chimney'});
 
   // ── shell: front (south) wall has the door gap; the rest is closed ──
   const wallMat=new THREE.MeshLambertMaterial({map:tiled(texPaint(34,0.16,0.62),3,1)});
   const WCOL='#c9bda6',WOPT={mat:wallMat};
-  wallSeg(-HW,-HD,-0.55,-HD,WCOL,WOPT); wallSeg(0.55,-HD,HW,-HD,WCOL,WOPT);
+  wallSeg(-HW,-HD,-_p(0.55),-HD,WCOL,WOPT); wallSeg(_p(0.55),-HD,HW,-HD,WCOL,WOPT);
   wallSeg(-HW,-HD,-HW, HD,WCOL,WOPT);   wallSeg(HW,-HD,HW,HD,WCOL,WOPT);
   wallSeg(-HW, HD, HW, HD,WCOL,WOPT);
   /* ── interior: hall across the south, kitchen west, lounge + BEDROOM east.
         The bedroom matters: M5 needs somebody asleep, and June's most-attached
         object now sits on the nightstand beside her. ── */
-  wallSeg(-HW,-1.6,-3.4,-1.6,WCOL,WOPT);          // hall/kitchen wall + doorway
-  wallSeg(-2.4,-1.6, 1.6,-1.6,WCOL,WOPT);
-  wallSeg( 2.6,-1.6,  HW,-1.6,WCOL,WOPT);         // hall/lounge doorway
-  wallSeg(0,-1.6,0,HD,WCOL,WOPT);                 // kitchen / east side, solid
-  wallSeg(0,0.9,1.0,0.9,WCOL,WOPT);               // lounge/bedroom wall + doorway
-  wallSeg(2.0,0.9, HW,0.9,WCOL,WOPT);
+  wallSeg(-HW,_p(-1.6),_p(-3.4),_p(-1.6),WCOL,WOPT);   // hall/kitchen wall + doorway
+  wallSeg(_p(-2.4),_p(-1.6),_p(1.6),_p(-1.6),WCOL,WOPT);
+  wallSeg(_p(2.6),_p(-1.6),HW,_p(-1.6),WCOL,WOPT);     // hall/lounge doorway
+  wallSeg(0,_p(-1.6),0,HD,WCOL,WOPT);                  // kitchen / east side, solid
+  wallSeg(0,_p(0.9),_p(1.0),_p(0.9),WCOL,WOPT);        // lounge/bedroom wall + doorway
+  wallSeg(_p(2.0),_p(0.9),HW,_p(0.9),WCOL,WOPT);
   // skirting boards — a small thing that makes interiors stop looking like boxes
   const skirt=(x1,z1,x2,z2)=>box(Math.abs(x2-x1)+0.14,0.11,Math.abs(z2-z1)+0.14,
     '#e6dfd2',(x1+x2)/2,0.055,(z1+z2)/2,{collide:false,cast:false,tag:'skirt'});
   skirt(-HW,-HD,HW,-HD); skirt(-HW,HD,HW,HD);
   skirt(-HW,-HD,-HW,HD); skirt(HW,-HD,HW,HD);
-  skirt(0,-1.6,0,HD);
+  skirt(0,_p(-1.6),0,HD);
 
   // ── the front door: a real collider, spliced out when it opens ──
   (function(){
     const pivot=new THREE.Group();
-    pivot.position.set(-0.55+OX,0,-HD);
-    const panel=new THREE.Mesh(new THREE.BoxGeometry(1.1,2.05,0.06),matL('#6b4a32'));
-    panel.position.set(0.55,1.025,0);pivot.add(panel);
+    const DW=_p(0.55);                       // half the doorway, in metres
+    pivot.position.set(-DW+OX,0,-HD);
+    const panel=new THREE.Mesh(new THREE.BoxGeometry(DW*2,2.05,0.06),matL('#6b4a32'));
+    panel.position.set(DW,1.025,0);pivot.add(panel);
     const knob=new THREE.Mesh(new THREE.SphereGeometry(0.035,10,8),matL('#c9a84a'));
-    knob.position.set(1.0,1.0,0.06);pivot.add(knob);
+    knob.position.set(DW*1.82,1.0,0.06);pivot.add(knob);
     scene.add(pivot);envMeshes.push(pivot);
     const R=CONST.PLAYER_R;
-    const coll={minX:-0.55-R+OX,maxX:0.55+R+OX,minZ:-HD-0.1-R,maxZ:-HD+0.1+R,
+    const coll={minX:-DW-R+OX,maxX:DW+R+OX,minZ:-HD-0.1-R,maxZ:-HD+0.1+R,
                 top:2.05,tag:'door'};
     colliders.push(coll);
     const d={pivot,coll,locked:!def.yours,open:false,pos:[OX,1.0,-HD],
@@ -2779,82 +2802,85 @@ function buildHouse(def,rng){
   box(YARD.maxX-YARD.minX,0.10,0.09,'#c8bda6',0,0.50,fy,{collide:false,tag:'rail'});
   box(YARD.maxX-YARD.minX,0.10,0.09,'#c8bda6',0,0.26,fy,{collide:false,tag:'rail'});
   for(let px=YARD.minX+0.3;px<YARD.maxX-0.2;px+=0.62){
-    if(Math.abs(px)<0.9)continue;                       // the gate gap, on the path
+    if(Math.abs(px)<_p(0.9))continue;                   // the gate gap, on the path
     box(0.09,0.68,0.06,'#d6cbb4',px,0.34,fy,{collide:false,cast:true,tag:'picket'});
   }
   box(YARD.maxX-YARD.minX,0.62,0.10,'#5b4b34',0,0.31,fy,{tag:'fence'});
   box(0.10,0.62,YARD.maxZ-YARD.minZ-0.2,'#5b4b34',YARD.minX,0.31,(fy+YARD.maxZ)/2,{tag:'fence'});
   box(0.10,0.62,YARD.maxZ-YARD.minZ-0.2,'#5b4b34',YARD.maxX,0.31,(fy+YARD.maxZ)/2,{tag:'fence'});
-  const pathM=new THREE.Mesh(new THREE.PlaneGeometry(1.4,5.4),
+  const pathM=new THREE.Mesh(new THREE.PlaneGeometry(_p(1.4),_p(5.4)),
     new THREE.MeshLambertMaterial({map:tiled(texConcrete(),1,4)}));
-  pathM.rotation.x=-Math.PI/2;pathM.position.set(OX,0.006,-6.2);
+  pathM.rotation.x=-Math.PI/2;pathM.position.set(OX,0.006,_p(-6.2));
   pathM.receiveShadow=true;scene.add(pathM);envMeshes.push(pathM);
-  box(2.6,0.75,0.7,'#2f4a2c',-3.4,0.375,-4.1,{tag:'hedge'});
-  box(2.6,0.75,0.7,'#2f4a2c', 3.4,0.375,-4.1,{tag:'hedge'});
+  box(_p(2.6),0.75,0.7,'#2f4a2c',_p(-3.4),0.375,_p(-4.1),{tag:'hedge'});
+  box(_p(2.6),0.75,0.7,'#2f4a2c',_p( 3.4),0.375,_p(-4.1),{tag:'hedge'});
 
   /* Streetlight: the only strong light on the lot, and the reason crossing the path
      is dangerous. Both a real THREE light and a gameplay light ZONE (see addLight). */
-  box(0.14,3.4,0.14,'#3a3a42',-3.0,1.70,-8.3,{tag:'lamppost'});
-  box(0.5,0.22,0.5,'#4a4a54',-3.0,3.45,-8.3,{collide:false,tag:'lamphead'});
+  box(0.14,3.4,0.14,'#3a3a42',_p(-3.0),1.70,_p(-8.3),{tag:'lamppost'});
+  box(0.5,0.22,0.5,'#4a4a54',_p(-3.0),3.45,_p(-8.3),{collide:false,tag:'lamphead'});
   const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.13,10,8),
     new THREE.MeshBasicMaterial({color:'#ffdca8'}));
-  bulb.position.set(-3.0+OX,3.30,-8.3);bulb.userData.temporal=true;scene.add(bulb);
+  bulb.position.set(_p(-3.0)+OX,3.30,_p(-8.3));bulb.userData.temporal=true;scene.add(bulb);
   // a tight pool, not area lighting: crossing it should feel like a decision.
   // No shadow casting — the moon's shadow map is the one that sells the scene, and a
   // second shadow-casting light roughly halves the frame rate on software GL.
   const lampL=new THREE.PointLight('#ffcf94',2.4,9.5,1.7);
-  lampL.position.set(-3.0,3.25,-8.3);
-  addLight(-3.0,-8.3,5.0,1.0,lampL);
+  lampL.position.set(_p(-3.0),3.25,_p(-8.3));
+  addLight(_p(-3.0),_p(-8.3),_p(5.0),1.0,lampL);
 
   const keyIn=Math.floor(rng()*3);
-  if(!def.yours)[[-1.9,-4.5],[1.9,-4.5],[-1.9,-6.8]].forEach((p,i)=>{
-    box(0.44,0.36,0.44,'#7c4f3c',p[0],0.18,p[1],{tag:'planter'});
-    box(0.36,0.06,0.36,'#3f5730',p[0],0.38,p[1],{collide:false,tag:'soil'});
+  if(!def.yours)[[-1.9,-4.5],[1.9,-4.5],[-1.9,-6.8]].forEach((q,i)=>{
+    const px=_p(q[0]),pz=_p(q[1]);
+    box(0.44,0.36,0.44,'#7c4f3c',px,0.18,pz,{tag:'planter'});
+    box(0.36,0.06,0.36,'#3f5730',px,0.38,pz,{collide:false,tag:'soil'});
     const bush=new THREE.Mesh(new THREE.SphereGeometry(0.22,10,8),matL('#3d6034'));
-    bush.position.set(p[0]+OX,0.50,p[1]);bush.scale.y=0.8;bush.castShadow=true;
+    bush.position.set(px+OX,0.50,pz);bush.scale.y=0.8;bush.castShadow=true;
     scene.add(bush);envMeshes.push(bush);
-    PLANTERS.push({pos:[p[0]+OX,0.42,p[1]],searched:false,hasKey:i===keyIn,
+    PLANTERS.push({pos:[px+OX,0.42,pz],searched:false,hasKey:i===keyIn,
                    house:def.id,label:'planter'});
   });
 
   // ── windows (and the moonlight pools they throw on the floor) ──
-  windowPane(-HW,1.45, 1.20,1.20,1.00,'x');   // kitchen, west
-  windowPane( HW,1.45,-0.30,1.40,1.10,'x');   // lounge, east
-  windowPane( 2.4,1.45, HD, 1.40,1.00,'z');   // bedroom, north
-  windowPane(-2.6,1.40,-HD,1.00,0.90,'z');    // hall, front
+  windowPane(-HW,1.45,_p( 1.20),1.20,1.00,'x');   // kitchen, west
+  windowPane( HW,1.45,_p(-0.30),1.40,1.10,'x');   // lounge, east
+  windowPane(_p( 2.4),1.45, HD, 1.40,1.00,'z');   // bedroom, north
+  windowPane(_p(-2.6),1.40,-HD,1.00,0.90,'z');    // hall, front
   const spill=(x,z,r,i)=>{
     const L=new THREE.PointLight('#9dbaf0',1.35,r*2.4,1.5);
     L.position.set(x,1.5,z);addLight(x,z,r,i,L);
   };
-  spill(-4.0, 1.20,2.3,0.42);
-  spill( 4.0,-0.30,2.5,0.46);
-  spill( 2.4, 2.95,2.3,0.42);
-  spill(-2.6,-3.05,1.9,0.38);
+  spill(_p(-4.0),_p( 1.20),_p(2.3),0.42);
+  spill(_p( 4.0),_p(-0.30),_p(2.5),0.46);
+  spill(_p( 2.4),_p( 2.95),_p(2.3),0.42);
+  spill(_p(-2.6),_p(-3.05),_p(1.9),0.38);
 
   // ── fixtures ──
   const counter=(x,z,w,d)=>box(w,0.92,d,'#c3b394',x,0.46,z,{tag:'counter'});
-  counter(-3.9,0.9,1.0,3.4);                       // kitchen run, west wall
-  counter(-1.9,3.05,3.0,0.7);                      // kitchen run, north wall
-  box(1.5,0.74,0.9,'#8a6a48',-2.0,0.37,0.4,{tag:'table'});     // kitchen table
+  /* Run LENGTHS scale (a counter spans a wall, and the wall grew); run DEPTHS and
+     every free-standing size do not (a counter is still 0.6m deep). */
+  counter(_p(-3.9),_p(0.9),1.0,_p(3.4));           // kitchen run, west wall
+  counter(_p(-1.9),_p(3.05),_p(3.0),0.7);          // kitchen run, north wall
+  box(1.5,0.74,0.9,'#8a6a48',_p(-2.0),0.37,_p(0.4),{tag:'table'});   // kitchen table
   [[-2.7,0.4],[-1.3,0.4]].forEach(c=>{
-    box(0.42,0.46,0.42,'#7a5c3e',c[0],0.23,c[1],{tag:'chair'});
-    box(0.42,0.52,0.08,'#7a5c3e',c[0],0.72,c[1]-0.17,{collide:false,tag:'chairback'});
+    box(0.42,0.46,0.42,'#7a5c3e',_p(c[0]),0.23,_p(c[1]),{tag:'chair'});
+    box(0.42,0.52,0.08,'#7a5c3e',_p(c[0]),0.72,_p(c[1])-0.17,{collide:false,tag:'chairback'});
   });
-  box(2.1,0.44,0.85,'#5d5170',3.3,0.22,-0.60,{tag:'sofa'});    // lounge
-  box(2.1,0.50,0.20,'#655878',3.3,0.47,-0.95,{collide:false,tag:'sofaback'});
-  box(1.0,0.42,0.55,'#7a6248',2.0,0.21,-0.50,{tag:'coffeetable'});
-  box(0.45,0.80,1.40,'#8a6a48',4.15,0.40,0.20,{tag:'sideboard'});
-  box(1.2,0.45,0.35,'#7a6248',-3.6,0.225,-2.6,{tag:'shoebench'});  // hall
+  box(2.1,0.44,0.85,'#5d5170',_p(3.3),0.22,_p(-0.60),{tag:'sofa'});  // lounge
+  box(2.1,0.50,0.20,'#655878',_p(3.3),0.47,_p(-0.60)-0.35,{collide:false,tag:'sofaback'});
+  box(1.0,0.42,0.55,'#7a6248',_p(2.0),0.21,_p(-0.50),{tag:'coffeetable'});
+  box(0.45,0.80,1.40,'#8a6a48',_p(4.15),0.40,_p(0.20),{tag:'sideboard'});
+  box(1.2,0.45,0.35,'#7a6248',_p(-3.6),0.225,_p(-2.6),{tag:'shoebench'});  // hall
 
   // ── the bedroom: where they are ──
-  box(0.70,2.00,1.20,'#6d5238',0.45,1.00,1.90,{tag:'wardrobe'});
-  box(1.75,0.32,1.95,'#6d5238',2.60,0.16,2.40,{tag:'bedframe'});
-  box(1.70,0.22,1.90,'#cfd4e2',2.60,0.43,2.40,{tag:'mattress'});
-  box(1.72,0.10,0.90,'#4e5a80',2.60,0.58,2.90,{collide:false,tag:'duvet'});
-  [[2.15],[3.05]].forEach(p=>
-    box(0.52,0.10,0.26,'#eef1f7',p[0],0.57,1.62,{collide:false,tag:'pillow'}));
-  box(0.44,0.55,0.40,'#6d5238',1.35,0.275,2.95,{tag:'nightstand'});
-  box(0.44,0.55,0.40,'#6d5238',3.85,0.275,2.95,{tag:'nightstand'});
+  box(0.70,2.00,1.20,'#6d5238',_p(0.45),1.00,_p(1.90),{tag:'wardrobe'});
+  box(1.75,0.32,1.95,'#6d5238',_p(2.60),0.16,_p(2.40),{tag:'bedframe'});
+  box(1.70,0.22,1.90,'#cfd4e2',_p(2.60),0.43,_p(2.40),{tag:'mattress'});
+  box(1.72,0.10,0.90,'#4e5a80',_p(2.60),0.58,_p(2.40)+0.50,{collide:false,tag:'duvet'});
+  [[2.15],[3.05]].forEach(q=>
+    box(0.52,0.10,0.26,'#eef1f7',_p(q[0]),0.57,_p(2.40)-0.78,{collide:false,tag:'pillow'}));
+  box(0.44,0.55,0.40,'#6d5238',_p(1.35),0.275,_p(2.95),{tag:'nightstand'});
+  box(0.44,0.55,0.40,'#6d5238',_p(3.85),0.275,_p(2.95),{tag:'nightstand'});
 
   // ── THE OBJECTS ──────────────────────────────────────────────────────────
   /* Walt's keys, in the dish by the door. His fixation is `precision`; this is the
@@ -2863,18 +2889,21 @@ function buildHouse(def,rng){
      specs currently carry yaw only — hanging it vertically needs a pitch/roll axis,
      which would change the delta maths. The dish-by-the-door is the same beat and
      just as suburban. Revisit if placement gains a full orientation. */
-  box(0.26,0.04,0.20,'#9a8a72',-3.6,0.47,-2.6,{collide:false,cast:false,tag:'dish'});
+  box(0.26,0.04,0.20,'#9a8a72',_p(-3.6),0.47,_p(-2.6),{collide:false,cast:false,tag:'dish'});
 
   /* ── THE OBJECTS. Data, not code (GDD 9) — extracted now that there are three
         houses to compare rather than guessed from a sample of one. The floorplan
         repeats; whose things sit in it does not. ── */
+  /* HOUSES authors t in LAYOUT UNITS like everything else above, so the scale is
+     applied here rather than in 30 hand-written entries. Y is untouched: those are
+     real furniture-top heights (counter 0.92, nightstand 0.55, floor 0). */
   (def.objects||[]).forEach(o=>{
     const spec=randomSpec(o.kind,rng);
     if(o.spec)Object.assign(spec,o.spec);
-    placeObject(o.kind,spec,o.at,o.rot||0,o.owner,o.attach,o.label);
+    placeObject(o.kind,spec,[_p(o.at[0]),o.at[1],_p(o.at[2])],o.rot||0,o.owner,o.attach,o.label);
   });
   (def.beds||[]).forEach(b=>{
-    const s=bed(b.who,b.x,2.40);
+    const s=bed(b.who,_p(b.x),_p(2.40));
     if(b.shift)s.shift=true;    // works nights — not always in it
   });
   OX=0;CUR_HOUSE=null;
@@ -2883,7 +2912,7 @@ function buildHouse(def,rng){
 /* ═════════════════════════ THE STREET ═════════════════════════
    Four lots. Yours, then the three you are working. Hoyt stays at x=0 so every
    coordinate the earlier milestones' tests assert against still holds. */
-const LOT_PITCH=16;
+const LOT_PITCH=16*CONST.ROOM_SCALE;   // the yards grew with the houses (M13)
 const HOUSES=[
   {id:'marek',x:-LOT_PITCH,name:'14 Ardsley Ct',yours:true,wall:'#cfc3b0'},
   {id:'hoyt', x:0,name:'12 Ardsley Ct',wall:'#c9bda6',
@@ -2945,7 +2974,7 @@ const HOUSES=[
      {kind:'mailbox',     at:[ 2.60,0.00,-6.20],rot:0,  owner:'dev',  attach:0.6,label:'the mailbox'},
    ]},
 ];
-const HOME={x:-LOT_PITCH,z:-6.8};
+const HOME={x:-LOT_PITCH,z:-6.8*CONST.ROOM_SCALE};
 function houseById(id){return HOUSES.filter(h=>h.id===id)[0];}
 
 function buildStreet(seed){
@@ -3282,8 +3311,11 @@ function updateCamera(dt){
 let hintT=null;
 function hint(m){const el=document.getElementById('hint');el.textContent=m;el.classList.add('on');
   clearTimeout(hintT);hintT=setTimeout(()=>el.classList.remove('on'),4200);}
+/* go() is the single funnel for every screen, which makes it the one correct place to
+   drop the mouse lock: a menu you cannot point at is worse than no menu (M13). */
 function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
-  if(id)document.getElementById(id).classList.add('on');}
+  if(id){document.getElementById(id).classList.add('on');
+         if(typeof releaseMouse==='function')releaseMouse();}}
 const $=id=>document.getElementById(id);
 
 function openMenu(){S.menuOpen=true;S.orbiting=false;go('s-pause');}
@@ -5138,27 +5170,60 @@ function showDossier(){
   go('s-dossier');S.menuOpen=true;
 }
 
-/* ═════════════════════════ INPUT ═════════════════════════ */
+/* ═════════════════════════ INPUT ═════════════════════════
+   MOUSE LOOK IS POINTER-LOCKED (M13). Click the canvas, the cursor disappears, and
+   the mouse turns the camera directly with no button held.
+
+   The M1 OTS contract is unchanged and still tested: looking around while IDLE does
+   NOT turn the body — that is what lets you peer round a corner — and the body only
+   swings to camera-forward once you actually move.
+
+   Lock is dropped whenever a screen goes up, because every menu needs a cursor. The
+   browser ALSO drops it on Esc by itself, so nothing here may assume it still holds. */
 let lastPX=0,lastPY=0;
 const PLAYABLE=()=>S.phase==='greybox'||S.phase==='house';
+const canLook=()=>!S.menuOpen&&!S.focus&&PLAYABLE();
+function isLocked(){return document.pointerLockElement===renderer.domElement;}
+function grabMouse(){
+  if(!canLook()||isLocked())return;
+  try{renderer.domElement.requestPointerLock();}catch(e){}
+}
+function releaseMouse(){
+  if(document.pointerLockElement&&document.exitPointerLock){
+    try{document.exitPointerLock();}catch(e){}
+  }
+}
+function look(dx,dy,sx,sy){
+  S.yaw-=dx*sx;
+  S.pitch=Math.max(CONST.CAM_PITCH_MIN,Math.min(CONST.CAM_PITCH_MAX,S.pitch+dy*sy));
+}
+renderer.domElement.addEventListener('click',grabMouse);
+document.addEventListener('pointerlockchange',()=>{S.orbiting=isLocked();});
+addEventListener('mousemove',e=>{
+  if(!isLocked()||!canLook())return;
+  /* movementX/Y is the raw device delta and the ONLY thing that reports while locked
+     — clientX stops changing the moment the cursor is captured. */
+  look(e.movementX||0,e.movementY||0,CONST.LOOK_SENS,CONST.LOOK_SENS*CONST.LOOK_PITCH);
+});
+
+/* The drag path below is kept ONLY as a fallback for a browser that refuses pointer
+   lock. It is no longer how the game is meant to be played. */
 renderer.domElement.addEventListener('pointerdown',e=>{
-  if(S.menuOpen||!PLAYABLE())return;
+  if(S.menuOpen||!PLAYABLE()||isLocked())return;
   if(e.button!==0&&e.button!==2)return;
-  S.orbiting=true;lastPX=e.clientX;lastPY=e.clientY;
+  S.dragging=true;lastPX=e.clientX;lastPY=e.clientY;
 });
 renderer.domElement.addEventListener('pointermove',e=>{
-  if(S.menuOpen)return;
+  if(S.menuOpen||isLocked())return;
   // a drag that ends off-window never fires pointerup — sync from the live
   // button bitmask instead. This recovery check is load-bearing; keep it.
-  if(!(e.buttons&1)&&!(e.buttons&2)){if(S.orbiting)S.orbiting=false;}
-  if(S.orbiting){
-    S.yaw-=(e.clientX-lastPX)*CONST.DRAG_YAW;
-    S.pitch=Math.max(CONST.CAM_PITCH_MIN,Math.min(CONST.CAM_PITCH_MAX,
-      S.pitch+(e.clientY-lastPY)*CONST.DRAG_PITCH));
+  if(!(e.buttons&1)&&!(e.buttons&2)){if(S.dragging)S.dragging=false;}
+  if(S.dragging){
+    look(e.clientX-lastPX,e.clientY-lastPY,CONST.DRAG_YAW,CONST.DRAG_PITCH);
     lastPX=e.clientX;lastPY=e.clientY;
   }
 });
-addEventListener('pointerup',()=>{S.orbiting=false;});
+addEventListener('pointerup',()=>{S.dragging=false;});
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('wheel',e=>{
   if(S.menuOpen||!PLAYABLE())return;
@@ -5419,6 +5484,8 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
   STORES,storeById,storeHas,
   // ── M11: onboarding ──
   GUIDE,GUIDE_STEPS,GUIDE_KEY,BAND_GLOSS,beginRun,
+  // - M13: mouse look -
+  look,grabMouse,releaseMouse,isLocked,canLook,
   // ── M7: her ladder acting, fractures, marking ──
   FRACTURES,fireFractures,markOwned,relocate,
   wifeTierIndex,planWifeNight,wifeNightTick,isHome,
@@ -5445,7 +5512,7 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
     keys.forEach(k=>S.keys[k]=false);
   },
   renderer,scene,camera,
-  version:'M12'};
+  version:'M13'};
 </script>
 
 </body>

@@ -26,7 +26,8 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
 | W A S D | move (camera-relative) |
 | Shift / Ctrl | run / sneak |
 | Space | jump |
-| Drag LMB / wheel | orbit camera / zoom |
+| Mouse | look around — **click once to capture the cursor**, Esc releases it |
+| Wheel | zoom |
 | E | examine, search, open — this is the whole interaction verb |
 | Tab | dossier: catalog, bag, and their state of mind |
 | M | go home — ends the night and shows you the morning |
@@ -65,4 +66,5 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
