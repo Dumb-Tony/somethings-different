@@ -1,4 +1,4 @@
-# Something's Different — playtest build
+﻿# Something's Different — playtest build
 
 **Play it: https://dumb-tony.github.io/somethings-different/**
 
@@ -36,14 +36,18 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
 ## Notes for the playtester
 
 - It's a **vertical slice**, not a finished game: four houses, six neighbours,
-  12 kinds of object, seven nights.
+  30 kinds of object, ten nights.
 - **Play it with sound on.** The low tone you can hear during the night is not music —
   it rises as the nearest sleeper gets closer to waking, and it's the only warning you
   get while you're looking at them instead of at the HUD. Sliders are on the title
   screen and in the pause menu.
-- A run ends when the street collapses (win), when the seven nights run out, when
-  your wife catches you three times, or when the neighbourhood gets suspicious enough
-  to compare notes.
+- A run ends when the street collapses (win), when the ten nights run out, when your
+  wife catches you three times, or when the neighbourhood gets suspicious enough to
+  compare notes.
+- **Spread your work across the whole street.** The win condition is a *mean* over the
+  six neighbours, so ruining two people and ignoring four cannot get you there no
+  matter how thorough you are. Roughly four objects a night, across different houses,
+  is a winning pace.
 - Sneak. Sound carries through doorways but not through walls, and June Hoyt is a
   light sleeper.
 - Every house's fridge hums at a slightly different pitch. That is on purpose.
@@ -61,3 +65,4 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
