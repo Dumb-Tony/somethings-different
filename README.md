@@ -52,6 +52,11 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
 - Sneak. Sound carries through doorways but not through walls, and June Hoyt is a
   light sleeper.
 - Every house's fridge hums at a slightly different pitch. That is on purpose.
+- **The street fights back.** As the neighbourhood gets rattled it starts installing
+  things and they never come off: motion lights over the porches, dogs left out in the
+  yards, a man walking the street at 2am, doorbell cameras, and eventually somebody in
+  each house awake all night. Succeeding is what triggers it, so a good run gets
+  harder rather than easier. The morning report tells you each time it happens.
 - **There are three shops, and they stock different things.** Bulwark Mart sells you
   roughly-similar; the second-hand place sells you *nothing like it*; the antique shop
   sells you *almost exactly it*. Which one you drive to should follow from who you're
@@ -66,5 +71,6 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 

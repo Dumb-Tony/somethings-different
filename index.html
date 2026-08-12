@@ -164,6 +164,10 @@ body.night #grade{opacity:1}
   border-radius:0 10px 10px 0}
 .rp-frac{border-left-color:var(--warm);background:#221d1a}
 .rp-frac .rp-band{color:var(--warm)}
+/* the street hardening (M14) - a fracture, but the neighbourhood's rather than a
+   person's, so it reads in the same family and in a colder colour */
+.rp-hard{border-left-color:#7f8ca8;background:#1a1d24}
+.rp-hard .rp-band{color:#9fb0cc}
 .rp-doubt{border-left-color:var(--alien)}
 .rp-cert{border-left-color:var(--coral)}
 .rp-miss{border-left-color:#4a4658}
@@ -229,7 +233,7 @@ body.night #grade{opacity:1}
 .ds-dim{color:var(--dim)}
 </style>
 
-<div id="build-tag">SOMETHING'S DIFFERENT · M13 · ARDSLEY COURT</div>
+<div id="build-tag">SOMETHING'S DIFFERENT · M14 · ARDSLEY COURT</div>
 
 <div id="hud">
   <div class="pill" id="clock">🌙 <b id="clock-v">23:00</b></div>
@@ -589,6 +593,27 @@ const CONST={
                             // spreading beats hammering one house — that is the
                             // strategy this number is set against. See GDD 15.
   LOSE_STREET : 70,         // mean neighbourhood Suspicion that ends the run
+  // ── hardening: the street escalates (GDD 5.8, M14) ────
+  /* GDD 5.8 keys this to Neighbourhood Suspicion at 25/40/55/70/85. MEASURED: a
+     careful player's street suspicion stays at exactly 0.0 for a whole run, and even
+     sloppy play peaks near 33 — so three of those five tiers can never fire, and 70
+     is the instant-loss line anyway. It would have been dead content.
+     ALERTNESS is therefore mostly DOUBT, which is the meter that actually moves
+     (8.8 -> 41.2 across a winning run). A street that hardens as it doubts punishes
+     success, which is the pressure this milestone exists to create. Suspicion and
+     sightings still count, and count for more, because being seen SHOULD hurt. */
+  ALERT_SUSP  : 1.5,        // weight on mean neighbourhood Suspicion
+  ALERT_SEEN  : 8,          // weight per sighting
+  HARDEN_AT   : [12,22,32,42,55],
+  HARD_LIGHT_R: 4.2,        // porch motion light: trigger radius and how bright it goes
+  HARD_LIGHT_I: 0.95,
+  HARD_DOG_R  : 5.0,        // a dog notices you this far into its yard
+  HARD_DOG_N  : 34,         // and the racket it makes, in sleeper-noise units
+  HARD_DOG_CD : 14,         // seconds before it can go off again
+  HARD_WATCH_V: 2.3,        // patrol speed, m/s
+  HARD_WATCH_R: 11.0,       // how far up the street he can pick you out
+  HARD_CAM_R  : 2.6,        // doorbell camera trigger radius
+  HARD_CAM_S  : 7,          // Suspicion per household, once per night
 };
 
 /* ═════════════════════════ RNG ═════════════════════════
@@ -3704,7 +3729,16 @@ const SFX=(function(){
       tone(p,v,1180,2100,0.16,'foley','sine');
       tone(p,v*0.5,2360,3050,0.12,'foley','sine',0.03);
     },
-    handle:function(p,mag,mtl){handleMtl(p,CONST.AUD_FOLEY_REF*p.g,mtl);}
+    handle:function(p,mag,mtl){handleMtl(p,CONST.AUD_FOLEY_REF*p.g,mtl);},
+    /* M14. Not the distant dog in the ambience bed - this one is in the yard with
+       you, and it is the sound of a house about to wake up. */
+    dog:function(p,mag){
+      const v=CONST.AUD_FOLEY_REF*p.g*1.15;
+      tone(p,v,340,205,0.17,'foley','sawtooth');
+      tone(p,v*0.8,315,190,0.15,'foley','sawtooth',0.24);
+      tone(p,v*0.7,330,200,0.16,'foley','sawtooth',0.46);
+      burst(p,v*0.35,900,0.7,0.20,'foley');
+    }
   };
 
   /* The public emitter. Returns whether anything was actually scheduled — that is
@@ -3942,6 +3976,176 @@ function nightReset(){
     if(s.group){s.group.userData.torso.rotation.x=0;s.group.visible=!s.absent;}
   }
   planWifeNight();
+  hardenNight();          // M14: set up whatever the street has installed by now
+}
+
+/* ═════════════════════════ HARDENING ═════════════════════════
+   The street escalates, and stays escalated (GDD 5.8). Before this, night 8 played
+   exactly like night 1: the neighbours' MINDS changed but the world never did.
+
+   ALERTNESS is deliberately mostly Doubt — see the note on ALERT_SUSP in CONST for
+   the measurement that forced it. The consequence is the good kind of pressure: the
+   better you are doing, the harder the street gets, so a winning run gets tighter
+   rather than easier. Suspicion and sightings weigh more per point, so a sloppy night
+   escalates the street faster than a clean one.
+
+   Everything here reuses machinery that already existed — light zones, emitNoise,
+   the sleeper state machine, canSee — rather than inventing a parallel system. */
+function streetAlert(){
+  return collapseIndex()
+       + streetSuspicion()*CONST.ALERT_SUSP
+       + (GAME.sightings||0)*CONST.ALERT_SEEN;
+}
+const HARDEN=[
+  {id:'lights',name:'MOTION LIGHTS',
+   text:'Somebody put a motion light over their porch. Then everybody did. The path to '+
+        'a front door is lit now, and it lights up because you are on it.'},
+  {id:'dogs',name:'DOGS LEFT OUT',
+   text:'The dogs are sleeping in the yards now instead of the kitchens. They are not '+
+        'guarding anything in particular. They just start up.'},
+  {id:'watch',name:'A NEIGHBOURHOOD WATCH',
+   text:'There is a man walking Ardsley Court at two in the morning with a torch and '+
+        'no dog. Nobody asked him to. He has a jacket with a word on it.'},
+  {id:'cameras',name:'DOORBELL CAMERAS',
+   text:'Four doorbells went up in a week. They record whoever stands at the door, and '+
+        'they do not need anybody to be awake.'},
+  {id:'shifts',name:'SLEEPING IN SHIFTS',
+   text:'Somebody in each house is awake all night now. They have not discussed it and '+
+        'they would not describe it as a rota, but that is what it is.'}
+];
+const DOGS=[],CAMS={};
+let WATCH=null,MOTION=[];
+function hardenedIds(){return GAME.hardened||(GAME.hardened=[]);}
+function isHardened(id){return hardenedIds().indexOf(id)>=0;}
+/* Called from doMorning, AFTER the night has landed. At most ONE step per morning:
+   a street that installs three things overnight reads as a bug, not as escalation. */
+function fireHardening(){
+  const a=streetAlert(),fired=[];
+  for(let i=0;i<HARDEN.length;i++){
+    const h=HARDEN[i];
+    if(isHardened(h.id))continue;
+    if(a<CONST.HARDEN_AT[i])break;      // tiers are ordered; stop at the first unmet
+    hardenedIds().push(h.id);
+    fired.push({id:h.id,name:h.name,text:h.text,at:CONST.HARDEN_AT[i]});
+    break;                              // one per morning
+  }
+  return fired;
+}
+/* Per-night setup. Rebuilt every night so a load, a restart or a new tier all land
+   in the same place. */
+function hardenNight(){
+  DOGS.length=0;MOTION.length=0;WATCH=null;
+  Object.keys(CAMS).forEach(k=>{delete CAMS[k];});
+  if(!HOUSES||!HOUSES.length)return;
+
+  if(isHardened('lights')){
+    HOUSES.forEach(h=>{
+      if(h.yours||!h._door)return;
+      /* A real light ZONE with intensity 0 until you trigger it. litAt reads LIGHTS
+         live, so the seeing checks pick this up with no extra plumbing. */
+      const z={x:h._door.pos[0],z:h._door.pos[2]+0.9,r:CONST.HARD_LIGHT_R,i:0};
+      LIGHTS.push(z);
+      const L=new THREE.PointLight('#fff0cf',0,CONST.HARD_LIGHT_R*2.2,1.6);
+      L.position.set(z.x,2.5,z.z);L.userData.temporal=true;scene.add(L);
+      MOTION.push({zone:z,three:L});
+    });
+  }
+  if(isHardened('dogs')){
+    HOUSES.forEach(h=>{
+      if(h.yours)return;
+      DOGS.push({house:h.id,x:h.x+CONST.ROOM_SCALE*2.6,z:-CONST.ROOM_SCALE*5.2,cd:0});
+    });
+  }
+  if(isHardened('watch')){
+    const xs=HOUSES.map(h=>h.x);
+    WATCH={x:Math.min.apply(null,xs)-2,z:-CONST.ROOM_SCALE*8.6,dir:1,
+           minX:Math.min.apply(null,xs)-3,maxX:Math.max.apply(null,xs)+3,seen:false};
+  }
+  if(isHardened('shifts')){
+    /* One of each couple sits up all night. Deterministic per night, so which half of
+       the household is awake is something you can learn rather than gamble on. */
+    const byHouse={};
+    SLEEPERS.forEach(s=>{if(!s.absent)(byHouse[s.house]=byHouse[s.house]||[]).push(s);});
+    Object.keys(byHouse).forEach(k=>{
+      const list=byHouse[k];
+      const pick=list[(GAME.day+k.length)%list.length];
+      pick.state='awake';pick.awake=1e9;pick.look=Math.PI*0.5;
+      if(pick.group&&pick.group.userData.torso)pick.group.userData.torso.rotation.x=-1.15;
+    });
+  }
+}
+/* Driven from nightTick. Everything in here is a READ of the player's position plus
+   the same emitNoise/canSee calls the rest of the night uses. */
+function hardenTick(dt){
+  if(!NIGHT.running||!player)return;
+  const px=player.position.x,pz=player.position.z;
+
+  for(let i=0;i<MOTION.length;i++){
+    const m=MOTION[i];
+    const on=Math.hypot(px-m.zone.x,pz-m.zone.z)<CONST.HARD_LIGHT_R;
+    const want=on?CONST.HARD_LIGHT_I:0;
+    if(m.zone.i!==want){
+      m.zone.i=want;
+      if(m.three)m.three.intensity=on?2.2:0;
+      if(on)hint('A light snaps on over the porch.');
+    }
+  }
+  for(let i=0;i<DOGS.length;i++){
+    const d=DOGS[i];
+    if(d.cd>0){d.cd-=dt;continue;}
+    if(Math.hypot(px-d.x,pz-d.z)<CONST.HARD_DOG_R){
+      d.cd=CONST.HARD_DOG_CD;
+      SFX.world('dog',d.x,d.z,CONST.HARD_DOG_N);   // you hear it where it is
+      /* The HOUSEHOLD hears a flat amount, deliberately NOT run through the distance
+         and wall model. That model exists to attenuate YOUR movements; applied here it
+         silences a dog standing ten metres from a bedroom, because the house is 10.8m
+         deep and NOISE_RANGE is 11 - a front-yard dog would be mathematically incapable
+         of waking anybody, which is the exact opposite of what a dog is for.
+         One bark is a warning; staying in the yard is what wakes them. */
+      for(let k=0;k<SLEEPERS.length;k++){
+        const sl=SLEEPERS[k];
+        if(sl.house!==d.house||sl.absent)continue;
+        sl.noise+=CONST.HARD_DOG_N;sl.sinceStir+=CONST.HARD_DOG_N;
+      }
+      hint('A dog starts up in the yard.');
+    }
+  }
+  if(WATCH){
+    WATCH.x+=WATCH.dir*CONST.HARD_WATCH_V*dt;
+    if(WATCH.x>WATCH.maxX){WATCH.x=WATCH.maxX;WATCH.dir=-1;}
+    if(WATCH.x<WATCH.minX){WATCH.x=WATCH.minX;WATCH.dir=1;}
+    /* He only works outdoors. Inside a house you are his problem no longer, which
+       makes the yards — not the rooms — the dangerous part of a hardened street. */
+    if(!WATCH.seen&&ceilAt(px,pz)<=0){
+      const dx=px-WATCH.x,dz=pz-WATCH.z,dist=Math.hypot(dx,dz);
+      const ahead=dist>0.2?(dx/dist)*WATCH.dir>-0.25:true;
+      if(dist<CONST.HARD_WATCH_R&&ahead&&
+         (dist<3.5||litAt(px,pz)>=CONST.LIT_SEEN_MIN)&&
+         wallsBetween(WATCH.x,WATCH.z,px,pz)===0){
+        WATCH.seen=true;
+        GAME.sightings++;
+        SFX.cue('seen');flash();
+        endNight('watch','A torch beam stops moving. The man in the jacket is looking '+
+          'straight at you across somebody else’s lawn, and he is already reaching '+
+          'for his phone.');
+      }
+    }
+  }
+  if(isHardened('cameras')){
+    for(let i=0;i<HOUSES.length;i++){
+      const h=HOUSES[i];
+      if(h.yours||!h._door||CAMS[h.id])continue;
+      if(Math.hypot(px-h._door.pos[0],pz-h._door.pos[2])<CONST.HARD_CAM_R){
+        CAMS[h.id]=true;
+        Object.keys(RESIDENTS).forEach(id=>{
+          const r=RESIDENTS[id];
+          if(r.house!==h.id)return;
+          r.suspicion=clamp((r.suspicion||0)+CONST.HARD_CAM_S,0,100);
+        });
+        hint('The doorbell blinks. It has your face now.');
+      }
+    }
+  }
 }
 
 /* Walls between two points. Uses the SAME collider list as physics, filtered to
@@ -4115,6 +4319,8 @@ function nightTick(dt){
     return;
   }
   wifeNightTick(dt);
+  if(!NIGHT.running)return;
+  hardenTick(dt);                 // M14: the street's own defences
   if(!NIGHT.running)return;
   updateSleepers(dt);
 }
@@ -4500,7 +4706,10 @@ const GAME={day:1,hasSpareKey:false,sightings:0,
   /* M11 — run state, so the guide and the one-off explanations survive a save.
      The player's PREFERENCE (guide on/off, intro seen) is not here: that lives in
      localStorage like the audio mix, because it must outlive any single run. */
-  guideStep:0,guideDone:false,glossed:{}};
+  guideStep:0,guideDone:false,glossed:{},
+  /* M14. Which defences the street has installed. Part of GAME so save/load carries
+     it for free - a loaded game must not forget it has doorbell cameras. */
+  hardened:[],lastHarden:[]};
 const REQ_TARGETS=[97,92,80];
 
 function hashStr(s){let h=2166136261;
@@ -4789,6 +4998,7 @@ function doMorning(){
   }
   PENDING.length=0;GAME.day++;
   GAME.lastFractures=fireFractures();   // thresholds are checked AFTER the night lands
+  GAME.lastHarden=fireHardening();      // ...and so does the street's own reaction
   return lines;
 }
 
@@ -5028,6 +5238,12 @@ function showReport(reason,text){
   });
   (GAME.lastFractures||[]).forEach(f=>{
     h+='<div class="rp-item rp-frac"><div class="rp-band">FRACTURE &middot; DOUBT '+f.at+
+       '</div><div class="rp-say">'+f.text+'</div></div>';
+  });
+  /* The street's own reaction reads like a fracture because it is one - just the
+     neighbourhood's rather than a person's (M14). */
+  (GAME.lastHarden||[]).forEach(f=>{
+    h+='<div class="rp-item rp-hard"><div class="rp-band">THE STREET &middot; '+f.name+
        '</div><div class="rp-say">'+f.text+'</div></div>';
   });
   checkEnding();   // the run can end on any morning, not only at the deadline
@@ -5303,6 +5519,7 @@ function startHouse(){
   GAME.wagePenalty=0;GAME.bought={};GAME.scenesSeen={};GAME.watched=false;GAME.keys={};
   GAME.over=null;GAME.lastFractures=[];
   GAME.guideStep=0;GAME.guideDone=false;GAME.glossed={};   // a new run re-teaches (M11)
+  GAME.hardened=[];GAME.lastHarden=[];                     // ...on a soft street (M14)
   WIFE.susp=0;DAY.block=0;DAY.actions=CONST.ACTIONS_PER_BLOCK;DAY.log=[];
   Object.keys(RESIDENTS).forEach(id=>{
     const r=RESIDENTS[id];r.doubt=0;r.suspicion=0;r.stress=0;r.beats=0;
@@ -5486,6 +5703,9 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
   GUIDE,GUIDE_STEPS,GUIDE_KEY,BAND_GLOSS,beginRun,
   // - M13: mouse look -
   look,grabMouse,releaseMouse,isLocked,canLook,
+  // - M14: the street hardens -
+  HARDEN,streetAlert,fireHardening,hardenNight,hardenTick,isHardened,
+  get DOGS(){return DOGS;}, get WATCH(){return WATCH;}, get MOTION(){return MOTION;},
   // ── M7: her ladder acting, fractures, marking ──
   FRACTURES,fireFractures,markOwned,relocate,
   wifeTierIndex,planWifeNight,wifeNightTick,isHome,
@@ -5512,7 +5732,7 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
     keys.forEach(k=>S.keys[k]=false);
   },
   renderer,scene,camera,
-  version:'M13'};
+  version:'M14'};
 </script>
 
 </body>
