@@ -168,6 +168,20 @@ body.night #grade{opacity:1}
    person's, so it reads in the same family and in a colder colour */
 .rp-hard{border-left-color:#7f8ca8;background:#1a1d24}
 .rp-hard .rp-band{color:#9fb0cc}
+/* the state-of-the-street readout on the day screen (M15). Every number in here
+   already existed; none of it had ever been shown during a run. */
+.dy-prog{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:11px 14px;margin:8px 0 10px}
+.dy-prow{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);
+  font-size:11px;letter-spacing:1.1px;color:var(--dim)}
+.dy-prow b{color:var(--paper);font-size:12px;white-space:nowrap}
+.dy-bar{flex:1;height:7px;border-radius:5px;background:var(--panel2);
+  border:1px solid var(--line);overflow:hidden}
+.dy-bar i{display:block;height:100%;background:var(--alien);transition:width .25s}
+.dy-prow2{display:flex;gap:16px;margin-top:7px;font-size:12px;color:var(--dim)}
+.dy-prow2 b{color:var(--text)}
+.dy-hard{margin-top:8px;padding-top:7px;border-top:1px solid var(--line);
+  font-family:var(--font-mono);font-size:10px;letter-spacing:1px;color:#9fb0cc}
 .rp-doubt{border-left-color:var(--alien)}
 .rp-cert{border-left-color:var(--coral)}
 .rp-miss{border-left-color:#4a4658}
@@ -233,7 +247,7 @@ body.night #grade{opacity:1}
 .ds-dim{color:var(--dim)}
 </style>
 
-<div id="build-tag">SOMETHING'S DIFFERENT · M14 · ARDSLEY COURT</div>
+<div id="build-tag">SOMETHING'S DIFFERENT · M15 · ARDSLEY COURT</div>
 
 <div id="hud">
   <div class="pill" id="clock">🌙 <b id="clock-v">23:00</b></div>
@@ -265,6 +279,7 @@ body.night #grade{opacity:1}
     Make them doubt themselves &mdash; without ever making them sure.</div>
   <button class="big-btn" id="btn-house">GO OUT TONIGHT</button>
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button class="ghost-btn" id="btn-diff">STANDARD</button>
     <button class="ghost-btn" id="btn-guide">GUIDE: ON</button>
     <button class="ghost-btn" id="btn-sound-title">sound</button>
     <button class="ghost-btn" id="btn-start">engine greybox</button>
@@ -395,7 +410,7 @@ body.night #grade{opacity:1}
 <!-- SOUND (M9). A .screen, so go() gives it exclusivity for free; BACK returns to
      whichever screen opened it (title or pause) via S.soundBack. -->
 <div class="screen" id="s-sound">
-  <h1>SOUND</h1>
+  <h1>OPTIONS</h1>
   <div class="sub">The night is quiet on purpose. That low tone you can hear rising is not
     music &mdash; it is how close the nearest sleeper is to opening their eyes.</div>
   <div class="mix" id="mix">
@@ -407,6 +422,8 @@ body.night #grade{opacity:1}
     <input type="range" id="mx-world" min="0" max="100" step="1"><output id="mx-world-v">85%</output>
     <label for="mx-foley">FOLEY</label>
     <input type="range" id="mx-foley" min="0" max="100" step="1"><output id="mx-foley-v">90%</output>
+    <label for="mx-sens">MOUSE</label>
+    <input type="range" id="mx-sens" min="35" max="250" step="5"><output id="mx-sens-v">100%</output>
   </div>
   <button class="ghost-btn" id="btn-sound-back">BACK</button>
 </div>
@@ -3408,6 +3425,52 @@ function updateHUD(dt){
    it: you can scan four things before opening a door, or shop at three shops, or start
    with the Vances instead of the Hoyts. Every predicate is therefore written against
    "any neighbour", not against the house the text happens to suggest. */
+/* ===================== DIFFICULTY + OPTIONS (M15) =====================
+   M14 shipped a street that escalates against you, and I could not verify whether
+   the curve is fair - the balance sweep drives the systems directly and never walks
+   the world, so it is never actually caught by the watchman or lit up on a porch.
+   Rather than guess, the two numbers that decide difficulty became adjustable from
+   the title screen. A brutal street is now a menu change instead of a code change.
+
+   CONST IS STILL THE SINGLE SOURCE OF TRUTH and STANDARD is exactly the shipped
+   numbers - the presets are MULTIPLIERS over it, and nothing here mutates CONST.
+   Mutating it would silently invalidate every assertion that reads it. */
+const DIFF_KEY='sd_diff_v1';
+const DIFFS=[
+  {id:'gentle',name:'GENTLE',win:0.80,harden:1.70,
+   note:'A lower bar, and a street slow to notice you.'},
+  {id:'standard',name:'STANDARD',win:1.00,harden:1.00,
+   note:'The numbers everything was measured against.'},
+  {id:'harsh',name:'HARSH',win:1.20,harden:0.65,
+   note:'More to prove, against a street that reacts fast.'}
+];
+const OPT=(function(){
+  const pref={diff:'standard',sens:1.0};
+  try{
+    const d=JSON.parse(localStorage.getItem(DIFF_KEY)||'null');
+    if(d&&typeof d==='object'){
+      if(DIFFS.some(x=>x.id===d.diff))pref.diff=d.diff;
+      if(typeof d.sens==='number'&&isFinite(d.sens))
+        pref.sens=Math.max(0.35,Math.min(2.5,d.sens));
+    }
+  }catch(e){}
+  function persist(){try{localStorage.setItem(DIFF_KEY,JSON.stringify(pref));}catch(e){}}
+  function cur(){return DIFFS.filter(d=>d.id===pref.diff)[0]||DIFFS[1];}
+  return {
+    get diff(){return pref.diff;},
+    get sens(){return pref.sens;},
+    preset:cur,
+    setDiff(id){if(DIFFS.some(d=>d.id===id)){pref.diff=id;persist();}return pref.diff;},
+    cycle(){const i=DIFFS.map(d=>d.id).indexOf(pref.diff);
+            pref.diff=DIFFS[(i+1)%DIFFS.length].id;persist();return pref.diff;},
+    setSens(v){pref.sens=Math.max(0.35,Math.min(2.5,+v||1));persist();return pref.sens;}
+  };
+})();
+/* The two numbers the whole difficulty of the slice rests on. Everything that used to
+   read CONST.SLICE_WIN_COLLAPSE or CONST.HARDEN_AT[i] goes through these instead. */
+function winBar(){return CONST.SLICE_WIN_COLLAPSE*OPT.preset().win;}
+function hardenAt(i){return CONST.HARDEN_AT[i]*OPT.preset().harden;}
+
 const GUIDE_KEY='sd_guide_v1';
 const GUIDE_HIDE_ON=['s-title','s-pause','s-sound','s-controls','s-intro',
                      's-report','s-end','s-dossier','s-talk'];
@@ -4024,9 +4087,9 @@ function fireHardening(){
   for(let i=0;i<HARDEN.length;i++){
     const h=HARDEN[i];
     if(isHardened(h.id))continue;
-    if(a<CONST.HARDEN_AT[i])break;      // tiers are ordered; stop at the first unmet
+    if(a<hardenAt(i))break;             // tiers are ordered; stop at the first unmet
     hardenedIds().push(h.id);
-    fired.push({id:h.id,name:h.name,text:h.text,at:CONST.HARDEN_AT[i]});
+    fired.push({id:h.id,name:h.name,text:h.text,at:Math.round(hardenAt(i))});
     break;                              // one per morning
   }
   return fired;
@@ -4945,7 +5008,7 @@ function checkEnding(){
   if(ss>=CONST.LOSE_STREET)return mk('street','THEY COMPARED NOTES',
     'The neighbourhood stopped wondering and started checking. Doors, cameras, a rota. '+
     'Certainty is the opposite of the assignment.');
-  if(ci>=CONST.SLICE_WIN_COLLAPSE)return mk('win','UNEXPLAINED PSYCHOLOGICAL EVENT',
+  if(ci>=winBar())return mk('win','UNEXPLAINED PSYCHOLOGICAL EVENT',
     'Nobody on Ardsley Court trusts what they remember. Nothing was stolen. Nothing '+
     'was broken. No crime has been committed and everyone is certain something happened. '+
     'Your species logs the method as viable and recalls you.');
@@ -4969,7 +5032,7 @@ function showEnding(){
   });
   h+='</div><div><div class="ds-h">THE FIGURES</div>'+
      '<div class="ds-row">Collapse Index <b>'+o.ci.toFixed(1)+'</b> / '+
-       CONST.SLICE_WIN_COLLAPSE+'</div>'+
+       winBar().toFixed(0)+'</div>'+
      '<div class="ds-row">Street suspicion <b>'+o.ss.toFixed(1)+'</b></div>'+
      '<div class="ds-row">Fractured past 75 <b>'+fracturedCount()+'</b></div>'+
      '<div class="ds-row">Dana <b>'+WIFE.susp.toFixed(0)+'</b> &middot; '+wifeTier().name+'</div>'+
@@ -5264,6 +5327,27 @@ function showDay(){
      (GAME.cash>0?' <span class="ds-dim">('+GAME.cash.toFixed(0)+' in cash)</span>':'')+
      ' &middot; HK '+GAME.hk.toFixed(0)+'</div>';
   h+='<div class="dy-sub">'+b.sub+'</div>';
+  /* THE STATE OF THE STREET (M15). Everything here already existed as a number; none
+     of it was ever shown to the player during a run, so "am I winning?" was
+     unanswerable until the ending screen told you. */
+  (function(){
+    const ci=collapseIndex(),bar=winBar(),pct=Math.max(0,Math.min(100,ci/bar*100));
+    const left=Math.max(0,CONST.SLICE_NIGHTS-GAME.day+1);
+    h+='<div class="dy-prog">'+
+       '<div class="dy-prow"><span>COLLAPSE</span>'+
+       '<div class="dy-bar"><i style="width:'+pct.toFixed(1)+'%"></i></div>'+
+       '<b>'+ci.toFixed(1)+' / '+bar.toFixed(0)+'</b></div>'+
+       '<div class="dy-prow2">'+
+       '<span><b>'+left+'</b> night'+(left===1?'':'s')+' left</span>'+
+       '<span>seen <b>'+GAME.sightings+'</b>/'+CONST.SEEN_LIMIT+'</span>'+
+       '<span>street <b>'+streetSuspicion().toFixed(0)+'</b>/'+CONST.LOSE_STREET+'</span>'+
+       '</div>';
+    const inst=(GAME.hardened||[]).map(function(id){
+      const H=HARDEN.filter(function(x){return x.id===id;})[0];return H?H.name:id;});
+    if(inst.length)
+      h+='<div class="dy-hard">THE STREET HAS INSTALLED &middot; '+inst.join(' &middot; ')+'</div>';
+    h+='</div>';
+  })();
   h+='<div class="dy-wife">Dana &mdash; <b>'+t.name+'</b>. '+t.note+'</div>';
   h+='<div class="dy-acts">';
   blockActions().forEach(k=>{
@@ -5419,7 +5503,8 @@ addEventListener('mousemove',e=>{
   if(!isLocked()||!canLook())return;
   /* movementX/Y is the raw device delta and the ONLY thing that reports while locked
      — clientX stops changing the moment the cursor is captured. */
-  look(e.movementX||0,e.movementY||0,CONST.LOOK_SENS,CONST.LOOK_SENS*CONST.LOOK_PITCH);
+  const sx=CONST.LOOK_SENS*OPT.sens;
+  look(e.movementX||0,e.movementY||0,sx,sx*CONST.LOOK_PITCH);
 });
 
 /* The drag path below is kept ONLY as a fallback for a browser that refuses pointer
@@ -5554,6 +5639,13 @@ $('btn-house').addEventListener('click',beginRun);
 /* ── guide + controls wiring (M11) ── */
 function syncGuideBtn(){$('btn-guide').textContent='GUIDE: '+(GUIDE.on?'ON':'OFF');}
 syncGuideBtn();
+function syncDiffBtn(){
+  const d=OPT.preset();
+  $('btn-diff').textContent=d.name;
+  $('btn-diff').title=d.note+'  (win bar '+winBar().toFixed(0)+')';
+}
+syncDiffBtn();
+$('btn-diff').addEventListener('click',function(){OPT.cycle();syncDiffBtn();hint(OPT.preset().note);});
 $('btn-guide').addEventListener('click',function(){GUIDE.setOn(!GUIDE.on);syncGuideBtn();});
 $('btn-intro-go').addEventListener('click',function(){GUIDE.markIntroSeen();startHouse();});
 $('btn-intro-skip').addEventListener('click',function(){
@@ -5578,6 +5670,12 @@ $('mx-mute').addEventListener('change',function(){
     $(p[1]+'-v').textContent=Math.round(+this.value)+'%';
   });
   $(p[1]).addEventListener('change',function(){SFX.cue(p[2]);});
+});
+/* Mouse sensitivity lives here rather than in a separate screen: it is the same kind
+   of thing as the volumes - a preference you set once and forget (M15). */
+$('mx-sens').addEventListener('input',function(){
+  OPT.setSens((+this.value)/100);
+  $('mx-sens-v').textContent=Math.round(+this.value)+'%';
 });
 $('btn-title').addEventListener('click',toTitle);
 $('btn-report-ok').addEventListener('click',function(){
@@ -5652,6 +5750,8 @@ function syncMix(){
     $(p[1]).value=pct;
     $(p[1]+'-v').textContent=pct+'%';
   });
+  const sp=Math.round(OPT.sens*100);
+  $('mx-sens').value=sp;$('mx-sens-v').textContent=sp+'%';
 }
 function openSound(from){
   soundBack=from||'s-pause';
@@ -5703,6 +5803,8 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
   GUIDE,GUIDE_STEPS,GUIDE_KEY,BAND_GLOSS,beginRun,
   // - M13: mouse look -
   look,grabMouse,releaseMouse,isLocked,canLook,
+  // - M15: difficulty + options -
+  OPT,DIFFS,DIFF_KEY,winBar,hardenAt,syncDiffBtn,
   // - M14: the street hardens -
   HARDEN,streetAlert,fireHardening,hardenNight,hardenTick,isHardened,
   get DOGS(){return DOGS;}, get WATCH(){return WATCH;}, get MOTION(){return MOTION;},
@@ -5732,7 +5834,7 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
     keys.forEach(k=>S.keys[k]=false);
   },
   renderer,scene,camera,
-  version:'M14'};
+  version:'M15'};
 </script>
 
 </body>

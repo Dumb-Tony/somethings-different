@@ -15,6 +15,10 @@ something *almost* the same. Every morning they wake up and look at it.
 - Land in the narrow gap between the two and they **doubt themselves**. That's the
   whole game.
 
+**If it's too hard, change it.** There's a difficulty button on the title screen —
+GENTLE / STANDARD / HARSH. It moves the win bar and how fast the street reacts, together.
+The day screen shows how close you are, so you can see it working.
+
 **The game explains itself now** — there's a premise card before the first night and a
 running objective in the corner that walks you through a complete night → day → night.
 If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
@@ -71,6 +75,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
