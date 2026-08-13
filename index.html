@@ -168,6 +168,9 @@ body.night #grade{opacity:1}
    person's, so it reads in the same family and in a colder colour */
 .rp-hard{border-left-color:#7f8ca8;background:#1a1d24}
 .rp-hard .rp-band{color:#9fb0cc}
+/* gossip (M16) - what the street said about you, in its own colour */
+.rp-gos{border-left-color:#b08cc4;background:#211a26}
+.rp-gos .rp-band{color:#c8a8dc}
 /* the state-of-the-street readout on the day screen (M15). Every number in here
    already existed; none of it had ever been shown during a run. */
 .dy-prog{background:var(--panel);border:1px solid var(--line);border-radius:12px;
@@ -247,7 +250,7 @@ body.night #grade{opacity:1}
 .ds-dim{color:var(--dim)}
 </style>
 
-<div id="build-tag">SOMETHING'S DIFFERENT · M15 · ARDSLEY COURT</div>
+<div id="build-tag">SOMETHING'S DIFFERENT · M16 · ARDSLEY COURT</div>
 
 <div id="hud">
   <div class="pill" id="clock">🌙 <b id="clock-v">23:00</b></div>
@@ -619,6 +622,13 @@ const CONST={
      (8.8 -> 41.2 across a winning run). A street that hardens as it doubts punishes
      success, which is the pressure this milestone exists to create. Suspicion and
      sightings still count, and count for more, because being seen SHOULD hurt. */
+  /* Gossip (GDD 5.8, M16). A CERTAINTY event travels along RELATIONS and lands on the
+     listener SCALED BY THE SPEAKER'S CREDIBILITY. That single multiplier is the whole
+     design: Marisol at 0.9 is a broadcast tower, Ray at 0.1 is a man nobody listens
+     to - which is exactly why being caught in RAY's house is the cheap mistake, and
+     why routing your loud work through him is a real strategy rather than a joke. */
+  GOSSIP_K    : 0.55,       // fraction of the speaker's Suspicion gain that travels
+  GOSSIP_MIN  : 0.5,        // below this nothing is said at all
   ALERT_SUSP  : 1.5,        // weight on mean neighbourhood Suspicion
   ALERT_SEEN  : 8,          // weight per sighting
   HARDEN_AT   : [12,22,32,42,55],
@@ -3015,6 +3025,25 @@ const HOUSES=[
      {kind:'remoteControl',at:[2.00,0.42,-0.50],rot:6,  owner:'dev',  attach:1.2,label:'the remote'},
      {kind:'mailbox',     at:[ 2.60,0.00,-6.20],rot:0,  owner:'dev',  attach:0.6,label:'the mailbox'},
    ]},
+  /* Ray at the dead end, next door to you. He has the smallest doubt window on the
+     street (floor 2, band 3) and the lowest credibility (0.1): almost impossible to
+     fool, and almost harmless when he is right. His things are chosen so some are
+     reachable from Bulwark's finest rung and some only from the antique shop -
+     attachment is what decides which, since perceived delta scales by it. */
+  {id:'pittman',x:-LOT_PITCH*2,name:'10 Ardsley Ct',wall:'#b9b3a4',
+   beds:[{who:'ray',x:2.60}],
+   objects:[
+     {kind:'bookRow',     at:[ 3.75,0.80, 0.05],rot:270,owner:'ray',attach:1.9,label:'the research'},
+     {kind:'posterPrint', at:[ 4.30,0.90,-0.90],rot:270,owner:'ray',attach:1.7,label:'the chart on the wall'},
+     {kind:'wallClock',   at:[ 2.90,1.58, 0.82],rot:180,owner:'ray',attach:1.4,label:'the clock he sets by the pips'},
+     {kind:'alarmClock',  at:[ 3.85,0.56, 2.95],rot:-6, owner:'ray',attach:1.2,label:'the alarm'},
+     {kind:'keyring',     at:[-3.60,0.49,-2.60],rot:10, owner:'ray',attach:1.1,label:"Ray's keys"},
+     {kind:'coffeeMug',   at:[-3.70,0.92, 0.20],rot:25, owner:'ray',attach:1.0,label:'the mug he counts in'},
+     {kind:'remoteControl',at:[2.00,0.42,-0.50],rot:-8, owner:'ray',attach:0.9,label:'the remote'},
+     {kind:'fridgeMagnet',at:[-3.90,0.92, 2.10],rot:0,  owner:'ray',attach:0.8,label:'the magnet'},
+     {kind:'doormat',     at:[ 0.00,0.00,-3.15],rot:0,  owner:'ray',attach:0.7,label:'the doormat'},
+     {kind:'mailbox',     at:[ 2.60,0.00,-6.20],rot:0,  owner:'ray',attach:0.6,label:'the mailbox he checks twice'},
+   ]}
 ];
 const HOME={x:-LOT_PITCH,z:-6.8*CONST.ROOM_SCALE};
 function houseById(id){return HOUSES.filter(h=>h.id===id)[0];}
@@ -3022,7 +3051,10 @@ function houseById(id){return HOUSES.filter(h=>h.id===id)[0];}
 function buildStreet(seed){
   clearWorld();
   const rng=mulberry32(seed===undefined?7:seed);
-  const minX=HOUSES[0].x-6.5,maxX=HOUSES[HOUSES.length-1].x+6.5;
+  /* min/max over EVERY lot, not first-and-last: HOUSES is ordered so that object
+     ids stay stable for the older suites, which is not the same as left-to-right. */
+  const xs=HOUSES.map(h=>h.x);
+  const minX=Math.min.apply(null,xs)-6.5,maxX=Math.max.apply(null,xs)+6.5;
   ROOM={minX:minX,maxX:maxX,minZ:-11.5,maxZ:3.5};
   // the road, running the length of the street in front of every lot
   const road=new THREE.Mesh(new THREE.PlaneGeometry(maxX-minX+8,4.0),
@@ -4772,7 +4804,7 @@ const GAME={day:1,hasSpareKey:false,sightings:0,
   guideStep:0,guideDone:false,glossed:{},
   /* M14. Which defences the street has installed. Part of GAME so save/load carries
      it for free - a loaded game must not forget it has doorbell cameras. */
-  hardened:[],lastHarden:[]};
+  hardened:[],lastHarden:[],lastGossip:[]};
 const REQ_TARGETS=[97,92,80];
 
 function hashStr(s){let h=2166136261;
@@ -4952,7 +4984,87 @@ const FRACTURES={
     {at:100,text:'June has stopped believing what she remembers. She believes the photographs instead.',
      apply(){RESIDENTS.june.collapsed=true;}},
   ],
+  /* Ray fractures INWARD. Everyone else starts doubting themselves; he was already
+     certain the world was being interfered with, so being right is what breaks him.
+     Note the 75: he stops telling anyone, which is the moment he becomes safe to work
+     on - and the moment his collapse stops helping the street notice. */
+  ray:[
+    {at:25,text:'Ray has photographed his own front room from four fixed points. He has '+
+                'labelled the photographs with times.',
+     apply(){markOwned('ray');}},
+    {at:50,text:'Ray has started keeping a log. He reads entries of it aloud at the '+
+                'mailbox to whoever is nearest.',
+     apply(){RESIDENTS.ray.attention=1.9;}},
+    {at:75,text:'Ray has stopped telling people. He says they are in on it, and he says '+
+                'it quietly, and then he goes inside.',
+     apply(){RESIDENTS.ray.credibility=0.04;RESIDENTS.ray.stress=clamp(RESIDENTS.ray.stress+18,0,100);}},
+    {at:100,text:'Ray was right about everything and it has not helped him at all.',
+     apply(){RESIDENTS.ray.collapsed=true;}},
+  ],
 };
+
+/* ═════════════════════════ GOSSIP ═════════════════════════
+   Who talks to whom (GDD 5.8). A CERTAINTY event travels one hop along these edges
+   and lands as Suspicion SCALED BY THE SPEAKER'S CREDIBILITY - so the same mistake
+   costs the street a great deal through Marisol (0.9) and almost nothing through Ray
+   (0.1). One hop only: a cascade would turn a single loud night into a street-wide
+   loss, and the graph is small enough that two hops is everybody. */
+const RELATIONS={
+  walt:['june','dev'],
+  june:['walt','marisol'],
+  marisol:['june','aaron','grace'],
+  aaron:['marisol','dev'],
+  dev:['grace','walt'],
+  grace:['dev','marisol'],
+  ray:['walt','marisol']        // he talks AT them, which is not the same as being heard
+};
+function gossip(lines){
+  const said=[];
+  (lines||[]).forEach(L=>{
+    if(!L.r||L.r.band!=='CERTAINTY')return;
+    const speaker=RESIDENTS[L.owner];
+    if(!speaker)return;
+    const heard=[];
+    (RELATIONS[L.owner]||[]).forEach(id=>{
+      const t=RESIDENTS[id];
+      if(!t||t.collapsed)return;
+      /* Only people who actually live on the street this run - activeResidents()
+         filters to residents who own something, and gossiping at somebody with no
+         possessions is gossiping at scenery. */
+      if(!objects.some(o=>o.owner===id))return;
+      const amt=(L.r.suspicion||0)*CONST.GOSSIP_K*(speaker.credibility||0);
+      if(amt<CONST.GOSSIP_MIN)return;
+      /* Record what LANDED, not what was said. Suspicion clamps at 100, so on a
+         catastrophic swap the raw figure overstates the damage wildly - the first
+         version of this reported '+408.4 across the street' when three people were
+         already pinned at 100. A report that inflates its own numbers is the same
+         bug as a shop shelf that lies about a forecast. */
+      const before=t.suspicion||0;
+      t.suspicion=clamp(before+amt,0,100);
+      const applied=t.suspicion-before;
+      if(applied<=0)return;              // already as suspicious as a person gets
+      heard.push({to:t.name,amt:applied});
+    });
+    if(heard.length)said.push({from:speaker.name,cred:speaker.credibility,
+                               label:L.label,heard:heard});
+  });
+  return said;
+}
+/* The line the report prints. Credibility is the joke and the mechanic at once. */
+function gossipLine(g){
+  const who=g.heard.map(h=>h.to.split(' ')[0]);
+  const list=who.length>1?(who.slice(0,-1).join(', ')+' and '+who[who.length-1]):who[0];
+  const total=g.heard.reduce((a,h)=>a+h.amt,0);
+  if(g.cred>=0.7)
+    return g.from+' told '+list+' about the '+g.label+', and they took it seriously. '+
+           'Suspicion +'+total.toFixed(1)+' across the street.';
+  if(g.cred>=0.4)
+    return g.from+' mentioned the '+g.label+' to '+list+'. It stayed mentioned. '+
+           'Suspicion +'+total.toFixed(1)+'.';
+  return g.from+' told '+list+' about the '+g.label+'. '+list+
+         ' agreed that it was strange and then changed the subject. Suspicion +'+
+         total.toFixed(1)+'.';
+}
 function fireFractures(){
   const out=[];
   Object.keys(FRACTURES).forEach(id=>{
@@ -5060,6 +5172,9 @@ function doMorning(){
                 labels:p.labels.slice(),doubtNow:res.doubt,suspNow:res.suspicion});
   }
   PENDING.length=0;GAME.day++;
+  /* Gossip runs BEFORE fractures so a fracture threshold can be crossed by what the
+     street said about you, not only by what you did (M16). */
+  GAME.lastGossip=gossip(lines);
   GAME.lastFractures=fireFractures();   // thresholds are checked AFTER the night lands
   GAME.lastHarden=fireHardening();      // ...and so does the street's own reaction
   return lines;
@@ -5302,6 +5417,10 @@ function showReport(reason,text){
   (GAME.lastFractures||[]).forEach(f=>{
     h+='<div class="rp-item rp-frac"><div class="rp-band">FRACTURE &middot; DOUBT '+f.at+
        '</div><div class="rp-say">'+f.text+'</div></div>';
+  });
+  (GAME.lastGossip||[]).forEach(g=>{
+    h+='<div class="rp-item rp-gos"><div class="rp-band">THEY TALKED</div>'+
+       '<div class="rp-say">'+gossipLine(g)+'</div></div>';
   });
   /* The street's own reaction reads like a fracture because it is one - just the
      neighbourhood's rather than a person's (M14). */
@@ -5605,6 +5724,8 @@ function startHouse(){
   GAME.over=null;GAME.lastFractures=[];
   GAME.guideStep=0;GAME.guideDone=false;GAME.glossed={};   // a new run re-teaches (M11)
   GAME.hardened=[];GAME.lastHarden=[];                     // ...on a soft street (M14)
+  GAME.lastGossip=[];
+  RESIDENTS.ray.credibility=0.10;RESIDENTS.ray.attention=1.6;   // his fractures move both
   WIFE.susp=0;DAY.block=0;DAY.actions=CONST.ACTIONS_PER_BLOCK;DAY.log=[];
   Object.keys(RESIDENTS).forEach(id=>{
     const r=RESIDENTS[id];r.doubt=0;r.suspicion=0;r.stress=0;r.beats=0;
@@ -5803,6 +5924,8 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
   GUIDE,GUIDE_STEPS,GUIDE_KEY,BAND_GLOSS,beginRun,
   // - M13: mouse look -
   look,grabMouse,releaseMouse,isLocked,canLook,
+  // - M16: Ray, and gossip -
+  RELATIONS,gossip,gossipLine,
   // - M15: difficulty + options -
   OPT,DIFFS,DIFF_KEY,winBar,hardenAt,syncDiffBtn,
   // - M14: the street hardens -
@@ -5834,7 +5957,7 @@ window.__SD={S,CONST,PHYS,colliders,envMeshes,helpers,
     keys.forEach(k=>S.keys[k]=false);
   },
   renderer,scene,camera,
-  version:'M15'};
+  version:'M16'};
 </script>
 
 </body>

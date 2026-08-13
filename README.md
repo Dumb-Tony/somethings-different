@@ -40,7 +40,7 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
 
 ## Notes for the playtester
 
-- It's a **vertical slice**, not a finished game: four houses, six neighbours,
+- It's a **vertical slice**, not a finished game: five houses, seven neighbours,
   30 kinds of object, ten nights.
 - **Play it with sound on.** The low tone you can hear during the night is not music —
   it rises as the nearest sleeper gets closer to waking, and it's the only warning you
@@ -56,6 +56,11 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
 - Sneak. Sound carries through doorways but not through walls, and June Hoyt is a
   light sleeper.
 - Every house's fridge hums at a slightly different pitch. That is on purpose.
+- **Ray Pittman at number 10 already knows.** He notices everything and is certain
+  about all of it, so he is nearly impossible to fool — and nobody believes a word he
+  says, so being caught in HIS house barely costs you. When somebody IS sure something
+  is wrong they tell the neighbours, and how much damage that does depends entirely on
+  who is doing the telling.
 - **The street fights back.** As the neighbourhood gets rattled it starts installing
   things and they never come off: motion lights over the porches, dogs left out in the
   yards, a man walking the street at 2am, doorbell cameras, and eventually somebody in
@@ -75,6 +80,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
