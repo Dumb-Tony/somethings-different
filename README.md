@@ -40,7 +40,7 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
 
 ## Notes for the playtester
 
-- It's a **vertical slice**, not a finished game: five houses, seven neighbours,
+- It's a **vertical slice**, not a finished game: five houses, seven neighbours, a cul-de-sac,
   30 kinds of object, ten nights.
 - **Play it with sound on.** The low tone you can hear during the night is not music —
   it rises as the nearest sleeper gets closer to waking, and it's the only warning you
@@ -56,6 +56,13 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
 - Sneak. Sound carries through doorways but not through walls, and June Hoyt is a
   light sleeper.
 - Every house's fridge hums at a slightly different pitch. That is on purpose.
+- **Look at things that are not theirs.** Pressing E on the fridge, the shelf, the
+  bins or the shoes tells you something about the people who live there. None of it
+  is swappable - and the prompt says so - but a house where Walt's shoes are lined
+  up with a ruler and Grace's post is still on the mat is telling you, before you
+  scan anything, which of them is going to notice.
+- **A car comes down the road every minute or so.** Its headlights are real light.
+  Being in the middle of the street when one arrives is a decision you get to regret.
 - **Ray Pittman at number 10 already knows.** He notices everything and is certain
   about all of it, so he is nearly impossible to fool — and nobody believes a word he
   says, so being caught in HIS house barely costs you. When somebody IS sure something
@@ -80,6 +87,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
