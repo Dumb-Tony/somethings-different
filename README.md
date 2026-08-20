@@ -61,7 +61,11 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
   is swappable - and the prompt says so - but a house where Walt's shoes are lined
   up with a ruler and Grace's post is still on the mat is telling you, before you
   scan anything, which of them is going to notice.
-- **Talking to people is not being polite, it is insurance.** Every afternoon you
+- **There is somewhere to go when it goes wrong.** Wardrobes, under beds, behind
+  sofas, garden sheds, the hedges by the path - press E at one and you are out of
+  the world until you come out again. Two catches: you cannot climb into a wardrobe
+  while somebody is already looking at you, and the clock keeps running while you
+  are in there. Hiding costs you the one thing the night is short of.- **Talking to people is not being polite, it is insurance.** Every afternoon you
   spend standing next to a neighbour makes them a little more familiar with your
   face, and a familiar face costs much less when it turns up in their garden at
   three in the morning. It wears off if you stop showing it. And it does almost
@@ -115,6 +119,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
