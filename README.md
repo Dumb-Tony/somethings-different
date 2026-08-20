@@ -61,7 +61,11 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
   is swappable - and the prompt says so - but a house where Walt's shoes are lined
   up with a ruler and Grace's post is still on the mat is telling you, before you
   scan anything, which of them is going to notice.
-- **There is somewhere to go when it goes wrong.** Wardrobes, under beds, behind
+- **In the evening you are at home, and Dana is there.** Not a dialogue box - your
+  own lounge with the lamps on and her in it. Where she is standing tells you how
+  bad it is before she says a word: on the sofa with her feet up, or in the kitchen
+  doing something she already did, or at the front window with the light off behind
+  her. Walk up to her and press E.- **There is somewhere to go when it goes wrong.** Wardrobes, under beds, behind
   sofas, garden sheds, the hedges by the path - press E at one and you are out of
   the world until you come out again. Two catches: you cannot climb into a wardrobe
   while somebody is already looking at you, and the clock keeps running while you
@@ -119,6 +123,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
