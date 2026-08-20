@@ -61,7 +61,11 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
   is swappable - and the prompt says so - but a house where Walt's shoes are lined
   up with a ruler and Grace's post is still on the mat is telling you, before you
   scan anything, which of them is going to notice.
-- **Watch the street watch back.** The longer you get away with it, the more Ardsley
+- **Go outside in the afternoon.** Pick *Walk the street* and you are out there in
+  daylight, on the same street you have only ever crept along in the dark, with
+  everybody who lives on it standing in their front gardens. Walk up to somebody and
+  press E. If the night did something to them, you will hear about it - and watching
+  a person come apart is how you learn to be one. Esc goes back inside.- **Watch the street watch back.** The longer you get away with it, the more Ardsley
   Court installs: porch lights that snap on when you cross a path, dogs left out in
   the yards, doorbell cameras with a little red LED, and eventually a man in a hi-vis
   jacket walking the road at two in the morning with a torch. You can see all of it
@@ -102,6 +106,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
