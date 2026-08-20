@@ -61,6 +61,15 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
   is swappable - and the prompt says so - but a house where Walt's shoes are lined
   up with a ruler and Grace's post is still on the mat is telling you, before you
   scan anything, which of them is going to notice.
+- **Sell what you take.** When you swap something, you keep the original - and you
+  cannot afford this job without selling it. Second Chances is two towns over and pays
+  badly. Ardsley Antiques pays more than twice as much and is on this street, where
+  everything it buys goes in the window and the people you took it from walk past.
+  Anything they were attached to, they will recognise. That is the whole decision.
+- **Things happen at night that are nothing to do with you.** A phone rings in an
+  empty kitchen. A light goes on two doors down and you are standing in it. Something
+  goes through a bin. And sometimes somebody just gets up for a glass of water, and
+  walks through the house you happen to be in.
 - **A car comes down the road every minute or so.** Its headlights are real light.
   Being in the middle of the street when one arrives is a decision you get to regret.
 - **Ray Pittman at number 10 already knows.** He notices everything and is certain
@@ -87,6 +96,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
