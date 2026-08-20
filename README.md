@@ -61,7 +61,11 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
   is swappable - and the prompt says so - but a house where Walt's shoes are lined
   up with a ruler and Grace's post is still on the mat is telling you, before you
   scan anything, which of them is going to notice.
-- **Go outside in the afternoon.** Pick *Walk the street* and you are out there in
+- **Press Q.** The scanner marks everything of theirs you can see and tells you what
+  state it is in: never recorded, on file, or you already have a copy in the bag. It
+  reads through glass and not through walls, so you can stand in the garden and case
+  a room through the window before you ever open the door. It is also louder than
+  reading one thing by hand, and they can hear it.- **Go outside in the afternoon.** Pick *Walk the street* and you are out there in
   daylight, on the same street you have only ever crept along in the dark, with
   everybody who lives on it standing in their front gardens. Walk up to somebody and
   press E. If the night did something to them, you will hear about it - and watching
@@ -106,6 +110,7 @@ Single HTML file, no installer, no external requests — it runs entirely in the
 Desktop browser with a mouse and keyboard; it is not built for phones.
 
 This repo holds only the built page. Source, design doc, and tooling live elsewhere.
+
 
 
 
