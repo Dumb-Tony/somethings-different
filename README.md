@@ -147,3 +147,6 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
   you'd be stopping at. Stay out and it climbs, and so does everything that can take
   it off you. The assignment ends on the tenth night either way.
 - **The last night says it is the last night.** So does the day screen.
+- **Nudging is one press, one sound.** Holding an arrow used to emit a fresh noise
+  thirty times a second and wake the house while you were being careful.
+- **Climbing out of a wardrobe makes as much noise as climbing in.**
