@@ -141,3 +141,9 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
 
 
 
+
+- **You are not thrown out the moment you win.** Cross the collapse bar and the run
+  keeps going — the morning report grows a **CALL IT IN** button showing the number
+  you'd be stopping at. Stay out and it climbs, and so does everything that can take
+  it off you. The assignment ends on the tenth night either way.
+- **The last night says it is the last night.** So does the day screen.
