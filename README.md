@@ -65,24 +65,29 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
   own lounge with the lamps on and her in it. Where she is standing tells you how
   bad it is before she says a word: on the sofa with her feet up, or in the kitchen
   doing something she already did, or at the front window with the light off behind
-  her. Walk up to her and press E.- **There is somewhere to go when it goes wrong.** Wardrobes, under beds, behind
+  her. Walk up to her and press E.
+- **There is somewhere to go when it goes wrong.** Wardrobes, under beds, behind
   sofas, garden sheds, the hedges by the path - press E at one and you are out of
   the world until you come out again. Two catches: you cannot climb into a wardrobe
   while somebody is already looking at you, and the clock keeps running while you
-  are in there. Hiding costs you the one thing the night is short of.- **Talking to people is not being polite, it is insurance.** Every afternoon you
+  are in there. Hiding costs you the one thing the night is short of.
+- **Talking to people is not being polite, it is insurance.** Every afternoon you
   spend standing next to a neighbour makes them a little more familiar with your
   face, and a familiar face costs much less when it turns up in their garden at
   three in the morning. It wears off if you stop showing it. And it does almost
   nothing once you are inside their house - no amount of chat over a fence explains
-  why you are standing in their bedroom.- **Press Q.** The scanner marks everything of theirs you can see and tells you what
+  why you are standing in their bedroom.
+- **Press Q.** The scanner marks everything of theirs you can see and tells you what
   state it is in: never recorded, on file, or you already have a copy in the bag. It
   reads through glass and not through walls, so you can stand in the garden and case
   a room through the window before you ever open the door. It is also louder than
-  reading one thing by hand, and they can hear it.- **Go outside in the afternoon.** Pick *Walk the street* and you are out there in
+  reading one thing by hand, and they can hear it.
+- **Go outside in the afternoon.** Pick *Walk the street* and you are out there in
   daylight, on the same street you have only ever crept along in the dark, with
   everybody who lives on it standing in their front gardens. Walk up to somebody and
   press E. If the night did something to them, you will hear about it - and watching
-  a person come apart is how you learn to be one. Esc goes back inside.- **Watch the street watch back.** The longer you get away with it, the more Ardsley
+  a person come apart is how you learn to be one. Esc goes back inside.
+- **Watch the street watch back.** The longer you get away with it, the more Ardsley
   Court installs: porch lights that snap on when you cross a path, dogs left out in
   the yards, doorbell cameras with a little red LED, and eventually a man in a hi-vis
   jacket walking the road at two in the morning with a torch. You can see all of it
