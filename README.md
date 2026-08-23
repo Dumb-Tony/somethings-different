@@ -152,3 +152,6 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
 - **Climbing out of a wardrobe makes as much noise as climbing in.**
 - **The HUD tells you when you are hidden.** It used to say WALK while you were shut
   inside a wardrobe.
+- **Listen for Dana.** She used to wake up, check the bed and walk out of your front
+  door looking for you without making a single sound. Both of those have a cue now,
+  and they are the only warning you get before the run ends.
