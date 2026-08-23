@@ -104,7 +104,7 @@ If you'd rather work it out cold, turn it off on the title screen (GUIDE: ON).
   walks through the house you happen to be in.
 - **A car comes down the road every minute or so.** Its headlights are real light.
   Being in the middle of the street when one arrives is a decision you get to regret.
-- **Ray Pittman at number 10 already knows.** He notices everything and is certain
+- **Ray Pittman at number 8 already knows.** He notices everything and is certain
   about all of it, so he is nearly impossible to fool — and nobody believes a word he
   says, so being caught in HIS house barely costs you. When somebody IS sure something
   is wrong they tell the neighbours, and how much damage that does depends entirely on
