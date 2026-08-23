@@ -150,3 +150,5 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
 - **Nudging is one press, one sound.** Holding an arrow used to emit a fresh noise
   thirty times a second and wake the house while you were being careful.
 - **Climbing out of a wardrobe makes as much noise as climbing in.**
+- **The HUD tells you when you are hidden.** It used to say WALK while you were shut
+  inside a wardrobe.
