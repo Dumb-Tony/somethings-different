@@ -163,3 +163,7 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
   spends the day indoors standing over it — picking it up, putting it down, stepping
   back, picking it up again. You can see it from the street through their front
   window, and walking up to one teaches you far more than chatting over a fence.
+- **The houses are occupied.** People turn over in their sleep and the beds complain,
+  whether or not you have done anything. Something happens on the street every minute
+  and a half or so — a phone, a light two doors down, a fox in the bins, somebody up
+  for a glass of water.
