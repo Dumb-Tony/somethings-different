@@ -155,3 +155,7 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
 - **Listen for Dana.** She used to wake up, check the bed and walk out of your front
   door looking for you without making a single sound. Both of those have a cue now,
   and they are the only warning you get before the run ends.
+- **The scanner prints, too.** Press **F** to record something, then **R** to run off a
+  rough copy on the spot — so you can scan, copy and swap in the same night instead of
+  waiting for the shops to open. It cannot aim, though: you get the number you get, and
+  it is loud. That is what the shops are for — they sell you a *chosen* match.
