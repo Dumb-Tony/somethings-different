@@ -159,3 +159,7 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
   rough copy on the spot — so you can scan, copy and swap in the same night instead of
   waiting for the shops to open. It cannot aim, though: you get the number you get, and
   it is loud. That is what the shops are for — they sell you a *chosen* match.
+- **Go and watch them the next afternoon.** Anyone who doubted something last night
+  spends the day indoors standing over it — picking it up, putting it down, stepping
+  back, picking it up again. You can see it from the street through their front
+  window, and walking up to one teaches you far more than chatting over a fence.
