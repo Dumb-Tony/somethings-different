@@ -181,3 +181,9 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
   the afternoon. One reading a day, three to know somebody completely — how closely
   they look, and how far past that they will go before they stop blaming themselves.
   Study Walt and Walt's shelf becomes readable; it tells you nothing about June.
+- **You are dressed for it.** Steve wears a dark jacket and near-black trousers, so
+  against a sodium-lit wall he is a silhouette. He used to be issued a magenta shirt
+  by the same random wardrobe as the neighbours, which made the man burgling the
+  street the brightest thing on screen.
+- **The prompt sits on the thing.** "E examine her mother's vase" appears above the
+  vase now, not pinned to the bottom of the screen.
