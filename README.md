@@ -177,3 +177,7 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
   near people; by the third night it stops saying ??? and starts telling you what a
   purchase will actually do. Before that you are printing and guessing, which is the
   point — the early nights are where you make the mistakes.
+- **Read the people, not just the rooms.** Press **Q** standing next to a neighbour in
+  the afternoon. One reading a day, three to know somebody completely — how closely
+  they look, and how far past that they will go before they stop blaming themselves.
+  Study Walt and Walt's shelf becomes readable; it tells you nothing about June.
