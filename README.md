@@ -170,3 +170,6 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
 - **The street is lit by sodium lamps.** Warm amber outdoors, cool light indoors — so
   the colour of the light you are standing in tells you which side of a window you
   are on, which matters rather a lot when the whole game is about being seen.
+- **The objective points at something.** While the guide is on, an amber marker stands
+  over whatever it is currently asking about — the planter to search, the door to open,
+  the thing to record. Turn the guide off on the title screen and it goes away with it.
