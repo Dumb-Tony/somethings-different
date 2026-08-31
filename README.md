@@ -173,3 +173,7 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
 - **The objective points at something.** While the guide is on, an amber marker stands
   over whatever it is currently asking about — the planter to search, the door to open,
   the thing to record. Turn the guide off on the title screen and it goes away with it.
+- **The scanner calibrates by night three now.** Go out in the afternoons and stand
+  near people; by the third night it stops saying ??? and starts telling you what a
+  purchase will actually do. Before that you are printing and guessing, which is the
+  point — the early nights are where you make the mistakes.
