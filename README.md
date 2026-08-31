@@ -167,3 +167,6 @@ This repo holds only the built page. Source, design doc, and tooling live elsewh
   whether or not you have done anything. Something happens on the street every minute
   and a half or so — a phone, a light two doors down, a fox in the bins, somebody up
   for a glass of water.
+- **The street is lit by sodium lamps.** Warm amber outdoors, cool light indoors — so
+  the colour of the light you are standing in tells you which side of a window you
+  are on, which matters rather a lot when the whole game is about being seen.
